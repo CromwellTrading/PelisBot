@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin CineBot</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Estilos personalizados -->
+    <style>
+        body {
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .card {
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 30px -5px rgba(0,0,0,0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px -5px rgba(0,0,0,0.5);
+        }
+        .btn {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(0,0,0,0.5);
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Temas */
+        body.dark {
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            color: #f7fafc;
+        }
+        body.dark .card {
+            background: rgba(26, 32, 44, 0.8);
+        }
+        body.light {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #1a202c;
+        }
+        body.light .card {
+            background: rgba(255,255,255,0.7);
+            border-color: rgba(0,0,0,0.1);
+        }
+        /* Pestañas */
+        .tab {
+            transition: all 0.2s;
+        }
+        .tab.active {
+            border-bottom: 3px solid #8b5cf6;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="dark">
+    <div class="container mx-auto px-4 py-8 fade-in">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-600 text-transparent bg-clip-text">
+                🎬 CineBot Admin
+            </h1>
+            <div class="flex gap-4">
+                <button onclick="cambiarTema('dark')" class="btn px-4 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-700">
+                    <i class="fas fa-moon"></i> Oscuro
+                </button>
+                <button onclick="cambiarTema('light')" class="btn px-4 py-2 rounded-lg bg-yellow-300 text-gray-800 hover:bg-yellow-400">
+                    <i class="fas fa-sun"></i> Claro
+                </button>
+            </div>
+        </div>
+
+        <!-- Login Section -->
+        <div id="loginSection" class="card rounded-2xl p-8 max-w-md mx-auto">
+            <h2 class="text-2xl mb-4"><i class="fas fa-lock mr-2"></i>Acceso Administrador</h2>
+            <input type="password" id="password" placeholder="Contraseña" class="w-full p-3 rounded-lg bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 mb-4">
+            <button onclick="login()" class="btn w-full bg-gradient-to-r from-green-400 to-blue-500 text-white py-3 rounded-lg font-bold">
+                <i class="fas fa-sign-in-alt mr-2"></i>Entrar
+            </button>
+        </div>
+
+        <!-- Dashboard Section (visible tras login) -->
+        <div id="dashboardSection" class="hidden">
+            <!-- Pestañas -->
+            <div class="flex border-b border-gray-300 dark:border-gray-700 mb-6">
+                <button class="tab active px-6 py-3 text-lg" onclick="cambiarPestana('solicitudes')">
+                    <i class="fas fa-clock mr-2"></i>Solicitudes
+                </button>
+                <button class="tab px-6 py-3 text-lg" onclick="cambiarPestana('catalogo')">
+                    <i class="fas fa-film mr-2"></i>Catálogo
+                </button>
+                <button class="tab px-6 py-3 text-lg" onclick="cambiarPestana('usuarios')">
+                    <i class="fas fa-users mr-2"></i>Usuarios
+                </button>
+                <button class="ml-auto px-4 py-2 bg-red-600 text-white rounded-lg" onclick="logout()">
+                    <i class="fas fa-sign-out-alt mr-1"></i> Salir
+                </button>
+            </div>
+
+            <!-- Contenido de Solicitudes -->
+            <div id="solicitudesTab" class="tab-content">
+                <div class="mb-6 flex justify-between items-center">
+                    <h2 class="text-2xl"><i class="fas fa-tachometer-alt mr-2"></i>Solicitudes Pendientes</h2>
+                    <button onclick="cargarSolicitudes()" class="btn px-4 py-2 bg-blue-600 text-white rounded-lg">
+                        <i class="fas fa-sync-alt mr-1"></i> Actualizar
+                    </button>
+                </div>
+                <div id="solicitudesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Se llena con JS -->
+                </div>
+            </div>
+
+            <!-- Contenido de Catálogo -->
+            <div id="catalogoTab" class="tab-content hidden">
+                <div class="mb-6 flex flex-wrap gap-4 items-center justify-between">
+                    <h2 class="text-2xl"><i class="fas fa-film mr-2"></i>Catálogo de Películas</h2>
+                    <div class="flex gap-2">
+                        <input type="text" id="searchCatalogo" placeholder="Buscar..." class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">
+                        <button onclick="buscarCatalogo()" class="btn px-4 py-2 bg-blue-600 text-white rounded-lg">
+                            <i class="fas fa-search"></i>
+                        </button>
+                        <button onclick="mostrarFormAgregar()" class="btn px-4 py-2 bg-green-600 text-white rounded-lg">
+                            <i class="fas fa-plus"></i> Agregar
+                        </button>
+                    </div>
+                </div>
+                <!-- Formulario agregar película (oculto) -->
+                <div id="formAgregar" class="card p-6 mb-6 hidden">
+                    <h3 class="text-xl mb-4">Agregar nueva película</h3>
+                    <input type="text" id="nuevoTitulo" placeholder="Título" class="w-full p-3 rounded-lg bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 mb-3">
+                    <input type="number" id="nuevoMessageId" placeholder="Message ID" class="w-full p-3 rounded-lg bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 mb-3">
+                    <div class="flex gap-2">
+                        <button onclick="agregarPelicula()" class="btn px-4 py-2 bg-green-600 text-white rounded-lg">Guardar</button>
+                        <button onclick="cancelarAgregar()" class="btn px-4 py-2 bg-gray-600 text-white rounded-lg">Cancelar</button>
+                    </div>
+                </div>
+                <!-- Lista de películas -->
+                <div id="catalogoContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Se llena con JS -->
+                </div>
+                <!-- Paginación -->
+                <div id="catalogoPaginacion" class="flex justify-center mt-6 gap-2">
+                    <!-- Botones de página -->
+                </div>
+            </div>
+
+            <!-- Contenido de Usuarios -->
+            <div id="usuariosTab" class="tab-content hidden">
+                <div class="mb-6 flex justify-between items-center">
+                    <h2 class="text-2xl"><i class="fas fa-users mr-2"></i>Usuarios Activos</h2>
+                    <button onclick="cargarUsuarios()" class="btn px-4 py-2 bg-blue-600 text-white rounded-lg">
+                        <i class="fas fa-sync-alt mr-1"></i> Actualizar
+                    </button>
+                </div>
+                <div id="usuariosContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Se llena con JS -->
+                </div>
+                <div id="usuariosPaginacion" class="flex justify-center mt-6 gap-2">
+                    <!-- Botones de página -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== IMPORTANTE: REEMPLAZA ESTAS VARIABLES CON TUS DATOS DE SUPABASE =====
+        const SUPABASE_URL = 'https://tuproyecto.supabase.co';
+        const SUPABASE_ANON_KEY = 'tu-anon-key';
+        // ===========================================================================
+
+        const API_BASE = window.location.origin;
+        let currentPageCatalogo = 1;
+        let currentSearchCatalogo = '';
+        let currentPageUsuarios = 1;
+
+        // Verificar autenticación al cargar
+        window.onload = async function() {
+            const temaGuardado = localStorage.getItem('tema') || 'dark';
+            cambiarTema(temaGuardado);
+
+            const auth = await fetch(API_BASE + '/check-auth', { credentials: 'include' }).then(r => r.json());
+            if (auth.authenticated) {
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('dashboardSection').classList.remove('hidden');
+                cargarSolicitudes();
+                cargarCatalogo();
+                cargarUsuarios();
+            }
+        };
+
+        function cambiarTema(tema) {
+            document.body.className = tema;
+            localStorage.setItem('tema', tema);
+        }
+
+        function cambiarPestana(pestana) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            document.getElementById(pestana + 'Tab').classList.remove('hidden');
+            event.target.classList.add('active');
+        }
+
+        async function login() {
+            const pwd = document.getElementById('password').value;
+            const res = await fetch(API_BASE + '/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({password: pwd}),
+                credentials: 'include'
+            });
+            if (res.ok) {
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('dashboardSection').classList.remove('hidden');
+                cargarSolicitudes();
+                cargarCatalogo();
+                cargarUsuarios();
+            } else {
+                alert('Contraseña incorrecta');
+            }
+        }
+
+        async function logout() {
+            await fetch(API_BASE + '/logout', {method: 'POST', credentials: 'include'});
+            document.getElementById('loginSection').classList.remove('hidden');
+            document.getElementById('dashboardSection').classList.add('hidden');
+        }
+
+        // ================= SOLICITUDES =================
+        async function cargarSolicitudes() {
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+            const { data, error } = await supabase
+                .from('solicitudes_pago')
+                .select('*')
+                .eq('estado', 'pendiente')
+                .order('created_at', { ascending: false });
+            if (error) {
+                console.error(error);
+                alert('Error al cargar solicitudes');
+                return;
+            }
+            renderSolicitudes(data);
+        }
+
+        function renderSolicitudes(solicitudes) {
+            const container = document.getElementById('solicitudesContainer');
+            if (solicitudes.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No hay solicitudes pendientes</div>';
+                return;
+            }
+            container.innerHTML = '';
+            solicitudes.forEach(sol => {
+                const card = document.createElement('div');
+                card.className = 'card rounded-xl p-6 space-y-3';
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-bold text-lg">Usuario: ${sol.telegram_id}</h3>
+                            <p class="text-sm opacity-75">Plan: ${sol.plan_solicitado}</p>
+                            <p class="text-sm opacity-75">Método: ${sol.metodo_pago}</p>
+                        </div>
+                        <span class="px-2 py-1 bg-yellow-500 text-xs rounded-full">Pendiente</span>
+                    </div>
+                    <div class="relative group">
+                        <img src="${sol.captura_url}" alt="Captura" class="rounded-lg w-full h-40 object-cover cursor-pointer" onclick="window.open('${sol.captura_url}', '_blank')">
+                        <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition flex items-center justify-center">
+                            <i class="fas fa-search-plus text-white opacity-0 group-hover:opacity-100 text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mt-4">
+                        <button onclick="aprobarSolicitud('${sol.id}', ${sol.telegram_id}, '${sol.plan_solicitado}')" class="btn flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">
+                            <i class="fas fa-check mr-1"></i> Aprobar
+                        </button>
+                        <button onclick="rechazarSolicitud('${sol.id}', ${sol.telegram_id})" class="btn flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg">
+                            <i class="fas fa-times mr-1"></i> Rechazar
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function aprobarSolicitud(id, telegram_id, plan) {
+            if (!confirm('¿Aprobar esta solicitud? Se activará la suscripción por 30 días.')) return;
+
+            try {
+                const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+                // 1. Actualizar solicitud
+                const { error: updateError } = await supabase
+                    .from('solicitudes_pago')
+                    .update({ estado: 'aprobado' })
+                    .eq('id', id);
+                if (updateError) throw updateError;
+
+                // 2. Calcular fechas
+                const fechaInicio = new Date();
+                const fechaExpiracion = new Date();
+                fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
+
+                // 3. Upsert usuario
+                const { error: upsertError } = await supabase
+                    .from('usuarios')
+                    .upsert({
+                        telegram_id: telegram_id,
+                        plan: plan,
+                        fecha_inicio: fechaInicio.toISOString(),
+                        fecha_expiracion: fechaExpiracion.toISOString()
+                    }, { onConflict: 'telegram_id' });
+                if (upsertError) throw upsertError;
+
+                // 4. Notificar al usuario vía el bot
+                await fetch(API_BASE + '/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        telegram_id: telegram_id,
+                        mensaje: `✅ **¡Pago aprobado!**\n\nTu suscripción **${plan}** está activa hasta el ${fechaExpiracion.toLocaleDateString()}.\n¡Disfruta del catálogo! 🍿`
+                    }),
+                    credentials: 'include'
+                });
+
+                alert('Solicitud aprobada y usuario notificado.');
+                cargarSolicitudes();
+            } catch (e) {
+                console.error(e);
+                alert('Error al aprobar');
+            }
+        }
+
+        async function rechazarSolicitud(id, telegram_id) {
+            const motivo = prompt('Motivo del rechazo:');
+            if (motivo === null) return;
+            try {
+                const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+                await supabase
+                    .from('solicitudes_pago')
+                    .update({ estado: 'rechazado', motivo_rechazo: motivo })
+                    .eq('id', id);
+
+                await fetch(API_BASE + '/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        telegram_id: telegram_id,
+                        mensaje: `❌ **Pago rechazado**\n\nMotivo: ${motivo}\n\nPuedes intentar nuevamente con otro comprobante.`
+                    }),
+                    credentials: 'include'
+                });
+
+                alert('Solicitud rechazada.');
+                cargarSolicitudes();
+            } catch (e) {
+                console.error(e);
+                alert('Error al rechazar');
+            }
+        }
+
+        // ================= CATÁLOGO =================
+        async function cargarCatalogo(page = 1, search = '') {
+            currentPageCatalogo = page;
+            currentSearchCatalogo = search;
+            const url = `${API_BASE}/api/movies?page=${page}&limit=10&search=${encodeURIComponent(search)}`;
+            const res = await fetch(url, { credentials: 'include' });
+            if (!res.ok) {
+                if (res.status === 401) logout();
+                else alert('Error al cargar catálogo');
+                return;
+            }
+            const data = await res.json();
+            renderCatalogo(data.data);
+            renderPaginacionCatalogo(data.total, data.page, data.limit);
+        }
+
+        function renderCatalogo(peliculas) {
+            const container = document.getElementById('catalogoContainer');
+            if (peliculas.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No hay películas</div>';
+                return;
+            }
+            container.innerHTML = '';
+            peliculas.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'card rounded-xl p-6';
+                card.innerHTML = `
+                    <h3 class="font-bold text-lg mb-2">${p.titulo}</h3>
+                    <p class="text-sm opacity-75">Message ID: ${p.message_id}</p>
+                    <p class="text-xs opacity-50">ID: ${p.id}</p>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderPaginacionCatalogo(total, page, limit) {
+            const totalPages = Math.ceil(total / limit);
+            const paginacion = document.getElementById('catalogoPaginacion');
+            paginacion.innerHTML = '';
+            for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement('button');
+                btn.className = `px-3 py-1 rounded-lg ${i === page ? 'bg-purple-600 text-white' : 'bg-gray-300 dark:bg-gray-700'}`;
+                btn.innerText = i;
+                btn.onclick = () => cargarCatalogo(i, currentSearchCatalogo);
+                paginacion.appendChild(btn);
+            }
+        }
+
+        function buscarCatalogo() {
+            const search = document.getElementById('searchCatalogo').value;
+            cargarCatalogo(1, search);
+        }
+
+        function mostrarFormAgregar() {
+            document.getElementById('formAgregar').classList.remove('hidden');
+        }
+
+        function cancelarAgregar() {
+            document.getElementById('formAgregar').classList.add('hidden');
+        }
+
+        async function agregarPelicula() {
+            const titulo = document.getElementById('nuevoTitulo').value;
+            const message_id = document.getElementById('nuevoMessageId').value;
+            if (!titulo || !message_id) {
+                alert('Completa todos los campos');
+                return;
+            }
+            const res = await fetch(API_BASE + '/api/movies', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ titulo, message_id: parseInt(message_id) }),
+                credentials: 'include'
+            });
+            if (res.ok) {
+                alert('Película agregada');
+                document.getElementById('nuevoTitulo').value = '';
+                document.getElementById('nuevoMessageId').value = '';
+                document.getElementById('formAgregar').classList.add('hidden');
+                cargarCatalogo(1, '');
+            } else {
+                alert('Error al agregar');
+            }
+        }
+
+        // ================= USUARIOS =================
+        async function cargarUsuarios(page = 1) {
+            currentPageUsuarios = page;
+            const url = `${API_BASE}/api/users?page=${page}&limit=10`;
+            const res = await fetch(url, { credentials: 'include' });
+            if (!res.ok) {
+                if (res.status === 401) logout();
+                else alert('Error al cargar usuarios');
+                return;
+            }
+            const data = await res.json();
+            renderUsuarios(data.data);
+            renderPaginacionUsuarios(data.total, data.page, data.limit);
+        }
+
+        function renderUsuarios(usuarios) {
+            const container = document.getElementById('usuariosContainer');
+            if (usuarios.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No hay usuarios</div>';
+                return;
+            }
+            container.innerHTML = '';
+            usuarios.forEach(u => {
+                const expiracion = new Date(u.fecha_expiracion).toLocaleDateString();
+                const diasRestantes = Math.ceil((new Date(u.fecha_expiracion) - new Date()) / (1000*60*60*24));
+                const card = document.createElement('div');
+                card.className = 'card rounded-xl p-6';
+                card.innerHTML = `
+                    <h3 class="font-bold text-lg">Usuario: ${u.telegram_id}</h3>
+                    <p>Plan: ${u.plan}</p>
+                    <p>Expira: ${expiracion}</p>
+                    <p>Días restantes: ${diasRestantes}</p>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderPaginacionUsuarios(total, page, limit) {
+            const totalPages = Math.ceil(total / limit);
+            const paginacion = document.getElementById('usuariosPaginacion');
+            paginacion.innerHTML = '';
+            for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement('button');
+                btn.className = `px-3 py-1 rounded-lg ${i === page ? 'bg-purple-600 text-white' : 'bg-gray-300 dark:bg-gray-700'}`;
+                btn.innerText = i;
+                btn.onclick = () => cargarUsuarios(i);
+                paginacion.appendChild(btn);
+            }
+        }
+    </script>
+</body>
+</html>
