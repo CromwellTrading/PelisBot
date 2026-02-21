@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-    <!-- Fuse.js para búsqueda difusa -->
+    <!-- Fuse.js -->
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
     <style>
         * { font-family: 'Inter', sans-serif; }
@@ -18,6 +18,24 @@
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
             min-height: 100vh;
             color: #f1f5f9;
+            position: relative;
+            overflow-x: hidden;
+        }
+        /* Canvas de animación (cine) */
+        #cineCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* No bloquea clics */
+            z-index: 0;
+            opacity: 0.6; /* Sutil */
+        }
+        /* Todo el contenido va encima del canvas */
+        .container, .glass-card, .btn, .modal, .view-toggle, #userDisplay, #mainContent {
+            position: relative;
+            z-index: 10;
         }
         .glass-card {
             background: rgba(255, 255, 255, 0.05);
@@ -154,6 +172,9 @@
     </style>
 </head>
 <body class="p-4 md:p-8">
+    <!-- Canvas de animación (cine) -->
+    <canvas id="cineCanvas"></canvas>
+
     <!-- Modal para imagen ampliada -->
     <div id="imageModal" class="modal" onclick="cerrarModal()">
         <span class="close">&times;</span>
@@ -184,6 +205,136 @@
     </div>
 
     <script>
+        // ========== ANIMACIÓN DEL PROYECTOR (CINE) ==========
+        const canvas = document.getElementById('cineCanvas');
+        let ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+
+        function initCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+
+            // Crear partículas de polvo
+            particles = [];
+            for (let i = 0; i < 50; i++) {
+                particles.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    radius: Math.random() * 2 + 1,
+                    speedX: (Math.random() - 0.5) * 0.5,
+                    speedY: (Math.random() - 0.5) * 0.2,
+                    alpha: Math.random() * 0.5 + 0.2
+                });
+            }
+        }
+
+        function drawProjector() {
+            // Limpiar canvas
+            ctx.clearRect(0, 0, width, height);
+
+            // Dibujar proyector (esquina inferior izquierda)
+            const proyectorX = 50;
+            const proyectorY = height - 150;
+            const proyectorAncho = 120;
+            const proyectorAlto = 80;
+
+            // Cuerpo del proyector (rectángulo con sombra)
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+            ctx.shadowBlur = 20;
+            ctx.shadowOffsetX = 5;
+            ctx.shadowOffsetY = 5;
+
+            ctx.fillStyle = '#334155';
+            ctx.beginPath();
+            ctx.roundRect(proyectorX, proyectorY, proyectorAncho, proyectorAlto, 10);
+            ctx.fill();
+
+            // Lente (círculo)
+            ctx.shadowBlur = 30;
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            ctx.arc(proyectorX + proyectorAncho - 20, proyectorY + proyectorAlto / 2, 15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Reflejo de la lente
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(proyectorX + proyectorAncho - 20, proyectorY + proyectorAlto / 2, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Haz de luz (gradiente radial desde la lente hacia la pantalla)
+            const gradient = ctx.createRadialGradient(
+                proyectorX + proyectorAncho - 20, proyectorY + proyectorAlto / 2, 10,
+                proyectorX + proyectorAncho + 300, proyectorY + proyectorAlto / 2 - 50, 400
+            );
+            gradient.addColorStop(0, 'rgba(255, 255, 200, 0.3)');
+            gradient.addColorStop(0.5, 'rgba(255, 255, 200, 0.1)');
+            gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+
+            ctx.shadowBlur = 50;
+            ctx.fillStyle = gradient;
+            ctx.globalAlpha = 0.3 + Math.sin(Date.now() * 0.002) * 0.1; // Parpadeo
+            ctx.beginPath();
+            ctx.moveTo(proyectorX + proyectorAncho - 20, proyectorY + proyectorAlto / 2);
+            ctx.lineTo(proyectorX + proyectorAncho + 400, proyectorY + proyectorAlto / 2 - 100);
+            ctx.lineTo(proyectorX + proyectorAncho + 400, proyectorY + proyectorAlto / 2 + 100);
+            ctx.closePath();
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+
+            // Dibujar partículas (polvo) dentro del haz
+            ctx.fillStyle = 'white';
+            particles.forEach(p => {
+                // Actualizar posición
+                p.x += p.speedX;
+                p.y += p.speedY;
+
+                // Rebote en bordes
+                if (p.x < 0 || p.x > width) p.speedX *= -1;
+                if (p.y < 0 || p.y > height) p.speedY *= -1;
+
+                // Dibujar solo si está dentro del área del haz (aproximado)
+                ctx.globalAlpha = p.alpha * (0.5 + Math.sin(Date.now() * 0.001 + p.x) * 0.2);
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            requestAnimationFrame(drawProjector);
+        }
+
+        // Helper para rectángulo redondeado
+        CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+            if (w < 2 * r) r = w / 2;
+            if (h < 2 * r) r = h / 2;
+            this.moveTo(x + r, y);
+            this.lineTo(x + w - r, y);
+            this.quadraticCurveTo(x + w, y, x + w, y + r);
+            this.lineTo(x + w, y + h - r);
+            this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            this.lineTo(x + r, y + h);
+            this.quadraticCurveTo(x, y + h, x, y + h - r);
+            this.lineTo(x, y + r);
+            this.quadraticCurveTo(x, y, x + r, y);
+            return this;
+        };
+
+        window.addEventListener('resize', () => {
+            initCanvas();
+        });
+
+        // Iniciar animación
+        initCanvas();
+        drawProjector();
+
+        // ========== RESTO DEL CÓDIGO DE LA WEBAPP (sin cambios) ==========
         const API_BASE = window.location.origin;
         const urlParams = new URLSearchParams(window.location.search);
         const TELEGRAM_ID = urlParams.get('tg_id');
@@ -192,6 +343,7 @@
         let viewMode = 'admin';
         let allPeliculas = [];
         let fuse = null;
+        let estadisticas = {};
 
         // ========== MODAL ==========
         function abrirModal(url) {
@@ -215,7 +367,7 @@
                         <i class="fas fa-exclamation-triangle text-5xl text-yellow-400 mb-4"></i>
                         <h2 class="text-2xl font-bold mb-2">No se pudo identificar</h2>
                         <p class="mb-6">Para usar la webapp, ábrela desde el bot de Telegram.</p>
-                        <a href="https://t.me/your_bot_username" target="_blank" class="btn-primary inline-block">Ir al bot</a>
+                        <a href="https://t.me/vpncubaw_bot" target="_blank" class="btn-primary inline-block">Ir al bot</a>
                     </div>
                 `;
                 return;
@@ -276,7 +428,7 @@
             }
         }
 
-        // ========== PLANES (para usuarios inactivos) ==========
+        // ========== PLANES ==========
         function mostrarPlanes() {
             document.getElementById('mainContent').innerHTML = `
                 <div class="glass-card p-8">
@@ -358,7 +510,7 @@
 
                     <select id="metodoPago" class="w-full p-3 rounded-xl bg-white/10 border border-white/20 mb-4">
                         <option value="tarjeta">Transferencia bancaria (BPA/METRO/Monedero)</option>
-                        <option value="saldo">Saldo móvil</option>
+                        <option value="saldo">Saldo móvil 📲</option>
                     </select>
 
                     <input type="file" id="captura" accept="image/*" class="w-full p-2 rounded-xl bg-white/10 border border-white/20 mb-4">
@@ -387,8 +539,13 @@
                     })
                 });
                 if (res.ok) {
-                    alert('✅ Solicitud enviada. Espera la aprobación del administrador.');
-                    document.getElementById('formPagoContainer').innerHTML = '';
+                    alert('✅ Solicitud enviada. Espera la aprobación del administrador. La ventana se cerrará.');
+                    // Intentar cerrar la ventana
+                    window.close();
+                    // Si no se puede cerrar, redirigir a una página de gracias
+                    setTimeout(() => {
+                        window.location.href = 'https://t.me/vpncubaw_bot';
+                    }, 3000);
                 } else {
                     const error = await res.json();
                     alert('❌ Error al enviar: ' + (error.error || 'desconocido'));
@@ -418,6 +575,13 @@
                     </div>
                     <div id="catalogoGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                     <div id="paginacion" class="flex justify-center gap-2 mt-6"></div>
+                    
+                    <!-- Botón para sugerir película -->
+                    <div class="mt-8 text-center">
+                        <a href="https://t.me/vpncubaw_bot" target="_blank" class="btn-secondary inline-flex items-center gap-2">
+                            <i class="fab fa-telegram"></i> ¿No encuentras una película? ¡Sugiérele al bot!
+                        </a>
+                    </div>
                 </div>
             `;
             cargarTodasPeliculas();
@@ -504,6 +668,8 @@
                         <button onclick="cargarSolicitudes()" class="btn-secondary" id="tabSolicitudes">📋 Solicitudes</button>
                         <button onclick="cargarUsuarios()" class="btn-secondary" id="tabUsuarios">👥 Usuarios</button>
                         <button onclick="cargarCatalogoAdmin()" class="btn-secondary" id="tabCatalogo">🎬 Catálogo</button>
+                        <button onclick="cargarEstadisticas()" class="btn-secondary" id="tabEstadisticas">📊 Estadísticas</button>
+                        <button onclick="cargarSugerencias()" class="btn-secondary" id="tabSugerencias">💡 Sugerencias</button>
                     </div>
                     <div id="adminContent" class="space-y-4"></div>
                 </div>
@@ -512,7 +678,7 @@
         }
 
         function setActiveTab(tabId) {
-            ['tabSolicitudes', 'tabUsuarios', 'tabCatalogo'].forEach(id => {
+            ['tabSolicitudes', 'tabUsuarios', 'tabCatalogo', 'tabEstadisticas', 'tabSugerencias'].forEach(id => {
                 const btn = document.getElementById(id);
                 if (btn) btn.classList.remove('bg-white/20');
             });
@@ -520,7 +686,7 @@
             if (activeBtn) activeBtn.classList.add('bg-white/20');
         }
 
-        // Solicitudes
+        // ===== SOLICITUDES =====
         async function cargarSolicitudes() {
             setActiveTab('tabSolicitudes');
             try {
@@ -536,13 +702,15 @@
                     adminDiv.innerHTML = '<p class="text-center py-8">No hay solicitudes pendientes.</p>';
                     return;
                 }
-                adminDiv.innerHTML = solicitudes.map(s => `
+                adminDiv.innerHTML = solicitudes.map(s => {
+                    const metodoMostrar = s.metodo_pago === 'saldo' ? 'Saldo Móvil 📲' : (s.metodo_pago === 'tarjeta' ? 'Transferencia 💳' : 'Desconocido');
+                    return `
                     <div class="glass-card p-4">
                         <div class="flex flex-wrap gap-4 items-start justify-between">
                             <div>
                                 <p><strong>Usuario:</strong> ${s.telegram_id}</p>
                                 <p><strong>Plan:</strong> ${s.plan_solicitado}</p>
-                                <p><strong>Método:</strong> ${s.metodo_pago}</p>
+                                <p><strong>Método:</strong> ${metodoMostrar}</p>
                                 <p><strong>Fecha:</strong> ${new Date(s.created_at).toLocaleString()}</p>
                             </div>
                             <img src="${s.captura_url}" class="h-24 rounded-lg object-cover cursor-pointer" onclick="abrirModal('${s.captura_url}')">
@@ -552,7 +720,7 @@
                             <button onclick="rechazarSolicitud('${s.id}')" class="btn-secondary">Rechazar</button>
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
             } catch (e) {
                 document.getElementById('adminContent').innerHTML = '<p class="text-red-400">Error al cargar solicitudes</p>';
             }
@@ -589,7 +757,7 @@
             }
         }
 
-        // Usuarios
+        // ===== USUARIOS =====
         async function cargarUsuarios() {
             setActiveTab('tabUsuarios');
             try {
@@ -627,7 +795,7 @@
             }
         }
 
-        // Catálogo admin
+        // ===== CATÁLOGO ADMIN =====
         async function cargarCatalogoAdmin() {
             setActiveTab('tabCatalogo');
             try {
@@ -687,6 +855,115 @@
                 cargarCatalogoAdmin();
             } else {
                 alert('Error al agregar');
+            }
+        }
+
+        // ===== ESTADÍSTICAS =====
+        async function cargarEstadisticas() {
+            setActiveTab('tabEstadisticas');
+            try {
+                const res = await fetch(API_BASE + '/api/estadisticas', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ admin_id: TELEGRAM_ID })
+                });
+                if (!res.ok) throw new Error('No autorizado');
+                const data = await res.json();
+                estadisticas = data;
+                const adminDiv = document.getElementById('adminContent');
+                adminDiv.innerHTML = `
+                    <div class="glass-card p-6">
+                        <h3 class="text-2xl font-bold mb-4">📊 Estadísticas del mes</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div class="bg-white/10 rounded-xl p-4">
+                                <p class="text-sm opacity-70">Total pagos con tarjeta</p>
+                                <p class="text-3xl font-bold">${data.total_tarjeta} CUP</p>
+                            </div>
+                            <div class="bg-white/10 rounded-xl p-4">
+                                <p class="text-sm opacity-70">Total pagos con saldo</p>
+                                <p class="text-3xl font-bold">${data.total_saldo} CUP</p>
+                            </div>
+                            <div class="bg-white/10 rounded-xl p-4">
+                                <p class="text-sm opacity-70">Total general</p>
+                                <p class="text-3xl font-bold">${data.total_general} CUP</p>
+                            </div>
+                            <div class="bg-white/10 rounded-xl p-4">
+                                <p class="text-sm opacity-70">Comisión 15%</p>
+                                <p class="text-3xl font-bold text-yellow-400">${data.comision_15} CUP</p>
+                            </div>
+                        </div>
+                        ${data.cobrada ? 
+                            '<p class="text-green-400 font-bold">✅ Comisión ya cobrada este mes</p>' : 
+                            (usuario.es_admin_comision ? 
+                                '<button onclick="recogerComision()" class="btn-primary">💰 Recoger comisión</button>' : 
+                                '<p class="text-yellow-400">⏳ Comisión pendiente (solo el admin principal puede cobrar)</p>'
+                            )
+                        }
+                    </div>
+                `;
+            } catch (e) {
+                document.getElementById('adminContent').innerHTML = '<p class="text-red-400">Error al cargar estadísticas</p>';
+            }
+        }
+
+        async function recogerComision() {
+            if (!confirm('¿Confirmas que has recibido la comisión del 15%? Se reiniciará el contador para el próximo mes.')) return;
+            const res = await fetch(API_BASE + '/api/recoger-comision', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ admin_id: TELEGRAM_ID })
+            });
+            if (res.ok) {
+                alert('Comisión registrada correctamente');
+                cargarEstadisticas();
+            } else {
+                alert('Error al registrar la comisión');
+            }
+        }
+
+        // ===== SUGERENCIAS =====
+        async function cargarSugerencias() {
+            setActiveTab('tabSugerencias');
+            try {
+                const res = await fetch(API_BASE + '/api/sugerencias', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ admin_id: TELEGRAM_ID })
+                });
+                if (!res.ok) throw new Error('No autorizado');
+                const sugerencias = await res.json();
+                const adminDiv = document.getElementById('adminContent');
+                if (!sugerencias.length) {
+                    adminDiv.innerHTML = '<p class="text-center py-8">No hay sugerencias pendientes.</p>';
+                    return;
+                }
+                adminDiv.innerHTML = sugerencias.map(s => `
+                    <div class="glass-card p-4">
+                        <p><strong>Usuario:</strong> ${s.telegram_id}</p>
+                        <p><strong>Sugerencia:</strong> ${s.sugerencia}</p>
+                        <p><strong>Fecha:</strong> ${new Date(s.created_at).toLocaleString()}</p>
+                        <div class="flex gap-2 mt-4">
+                            <button onclick="marcarSugerencia('${s.id}', 'vista')" class="btn-primary">Marcar como vista</button>
+                            <button onclick="marcarSugerencia('${s.id}', 'agregada')" class="btn-secondary">Agregada al catálogo</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                document.getElementById('adminContent').innerHTML = '<p class="text-red-400">Error al cargar sugerencias</p>';
+            }
+        }
+
+        async function marcarSugerencia(id, estado) {
+            const res = await fetch(API_BASE + '/api/update-sugerencia', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ admin_id: TELEGRAM_ID, sugerencia_id: id, estado })
+            });
+            if (res.ok) {
+                alert('Sugerencia actualizada');
+                cargarSugerencias();
+            } else {
+                alert('Error al actualizar');
             }
         }
 
