@@ -20,10 +20,10 @@ const WEBHOOK_URL = process.env.WEBHOOK_URL || `${WEBAPP_URL}/webhook`;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// Precios
+// Precios actualizados (después de comisión del 15%)
 const PRECIOS = {
-  tarjeta: { clasico: 200, premium: 350 },
-  saldo: { clasico: 120, premium: 200 }
+  tarjeta: { clasico: 250, premium: 400 },
+  saldo: { clasico: 160, premium: 250 }
 };
 
 // ID fijo del admin que puede cobrar comisión (hardcodeado)
@@ -75,7 +75,7 @@ function getMainKeyboard(userId, tieneSuscripcion) {
   const keyboard = {
     keyboard: [
       [{ text: '🔍 Buscar' }, { text: '🎬 Ver planes' }, { text: '❓ Ayuda' }],
-      [{ text: '👤 Mi perfil' }, { text: '💡 Sugerir película' }]
+      [{ text: '👤 Mi perfil' }, { text: '💡 Sugerir película' }, { text: '🔐 VPN' }]
     ],
     resize_keyboard: true,
     one_time_keyboard: false
@@ -112,6 +112,7 @@ bot.onText(/\/start/, async (msg) => {
       `   • Presiona el botón **"🔍 Buscar"** y luego escribe el nombre.\n` +
       `   • También puedes usar la **webapp** para una experiencia mejorada.\n\n` +
       `💡 ¿No encuentras una película? Usa **"💡 Sugerir película"** para pedirla.\n\n` +
+      `🔐 ¿Necesitas una VPN? Prueba nuestro bot **@vpncubaw_bot** (botón "🔐 VPN").\n\n` +
       `🎉 Disfruta de tu experiencia VIP.`;
 
     bot.sendMessage(chatId, mensaje, { 
@@ -122,11 +123,11 @@ bot.onText(/\/start/, async (msg) => {
     const mensaje = 
       `🍿 **CineBot - Tu cine personal** 🍿\n\n` +
       `Para acceder al catálogo necesitas una suscripción.\n\n` +
-      `⚜️ **Clásico** — 200 CUP (tarjeta) / 120 CUP (saldo)\n` +
+      `⚜️ **Clásico** — ${PRECIOS.tarjeta.clasico} CUP (tarjeta) / ${PRECIOS.saldo.clasico} CUP (saldo)\n` +
       `   ✅ Catálogo completo\n` +
       `   ✅ Visualización sin límites\n` +
       `   ❌ No permite reenviar/guardar\n\n` +
-      `💎 **Premium** — 350 CUP (tarjeta) / 200 CUP (saldo)\n` +
+      `💎 **Premium** — ${PRECIOS.tarjeta.premium} CUP (tarjeta) / ${PRECIOS.saldo.premium} CUP (saldo)\n` +
       `   ✅ Todo lo del plan Clásico\n` +
       `   ✅ Reenvío y guardado de películas\n` +
       `   ✅ Prioridad en solicitudes\n\n` +
@@ -172,19 +173,24 @@ bot.on('message', async (msg) => {
     return;
   }
 
+  if (text === '🔐 VPN') {
+    bot.sendMessage(chatId, '🔐 Accede a nuestro bot VPN: [@vpncubaw_bot](https://t.me/vpncubaw_bot)', { parse_mode: 'Markdown' });
+    return;
+  }
+
   if (text === '🎬 Ver planes') {
     const mensaje = 
       '📋 **Planes disponibles**\n\n' +
-      '⚜️ **Clásico**\n' +
-      '   • Acceso al catálogo completo\n' +
-      '   • Visualización sin límites\n' +
-      '   • No permite reenviar/guardar\n' +
-      '   • Precio: 200 CUP (tarjeta) / 120 CUP (saldo)\n\n' +
-      '💎 **Premium**\n' +
-      '   • Todo lo del plan Clásico\n' +
-      '   • Reenvío y guardado de películas\n' +
-      '   • Prioridad en solicitudes\n' +
-      '   • Precio: 350 CUP (tarjeta) / 200 CUP (saldo)\n\n' +
+      `⚜️ **Clásico**\n` +
+      `   • Acceso al catálogo completo\n` +
+      `   • Visualización sin límites\n` +
+      `   • No permite reenviar/guardar\n` +
+      `   • Precio: ${PRECIOS.tarjeta.clasico} CUP (tarjeta) / ${PRECIOS.saldo.clasico} CUP (saldo)\n\n` +
+      `💎 **Premium**\n` +
+      `   • Todo lo del plan Clásico\n` +
+      `   • Reenvío y guardado de películas\n` +
+      `   • Prioridad en solicitudes\n` +
+      `   • Precio: ${PRECIOS.tarjeta.premium} CUP (tarjeta) / ${PRECIOS.saldo.premium} CUP (saldo)\n\n` +
       'Elige uno para continuar:';
     
     const inlineKeyboard = {
@@ -225,7 +231,8 @@ bot.on('message', async (msg) => {
       '• Los administradores aprobarán tu pago.\n' +
       '• Una vez activo, podrás buscar películas con "🔍 Buscar".\n' +
       '• Usa "👤 Mi perfil" para ver tu estado.\n' +
-      '• ¿Falta una película? Usa "💡 Sugerir película".\n\n' +
+      '• ¿Falta una película? Usa "💡 Sugerir película".\n' +
+      '• ¿Necesitas VPN? Prueba nuestro bot "🔐 VPN".\n\n' +
       '¿Dudas? Contacta a un administrador.';
     bot.sendMessage(chatId, ayuda, { parse_mode: 'Markdown' });
     return;
@@ -359,11 +366,11 @@ bot.on('callback_query', async (callbackQuery) => {
   else if (data === 'volver_planes') {
     const mensaje = 
       '📋 **Planes disponibles**\n\n' +
-      '⚜️ **Clásico** — 200 CUP (tarjeta) / 120 CUP (saldo)\n' +
+      `⚜️ **Clásico** — ${PRECIOS.tarjeta.clasico} CUP (tarjeta) / ${PRECIOS.saldo.clasico} CUP (saldo)\n` +
       '   ✅ Catálogo completo\n' +
       '   ✅ Visualización sin límites\n' +
       '   ❌ No permite reenviar/guardar\n\n' +
-      '💎 **Premium** — 350 CUP (tarjeta) / 200 CUP (saldo)\n' +
+      `💎 **Premium** — ${PRECIOS.tarjeta.premium} CUP (tarjeta) / ${PRECIOS.saldo.premium} CUP (saldo)\n` +
       '   ✅ Todo lo del plan Clásico\n' +
       '   ✅ Reenvío y guardado\n' +
       '   ✅ Prioridad en solicitudes\n\n' +
