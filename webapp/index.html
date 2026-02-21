@@ -146,7 +146,7 @@
         const TELEGRAM_ID = urlParams.get('tg_id');
 
         let usuario = null;
-        let viewMode = 'admin'; // 'admin' o 'user'
+        let viewMode = 'admin';
         let currentPageCatalogo = 1;
         let currentSearchCatalogo = '';
 
@@ -173,9 +173,10 @@
                 const data = await res.json();
                 usuario = { id: TELEGRAM_ID, ...data };
                 
-                // Si es admin, mostrar el toggle de vista
                 if (usuario.es_admin) {
                     document.getElementById('viewToggleContainer').classList.remove('hidden');
+                } else {
+                    document.getElementById('viewToggleContainer').classList.add('hidden');
                 }
                 
                 actualizarUI();
@@ -207,12 +208,9 @@
                 `;
             }
 
-            // Si es admin y está en modo admin, mostrar panel admin
             if (usuario.es_admin && viewMode === 'admin') {
                 mostrarPanelAdmin();
-            } 
-            // Si no es admin o está en modo usuario, mostrar vista de usuario
-            else {
+            } else {
                 if (usuario.activo) {
                     mostrarCatalogo();
                 } else {
@@ -221,7 +219,7 @@
             }
         }
 
-        // ========== VISTA DE PLANES (para usuarios no activos) ==========
+        // ========== VISTA DE PLANES ==========
         function mostrarPlanes() {
             document.getElementById('mainContent').innerHTML = `
                 <div class="glass-card p-8">
@@ -268,28 +266,46 @@
         }
 
         function mostrarFormPago(plan) {
+            const montoTarjeta = plan === 'clasico' ? 200 : 350;
+            const montoSaldo = plan === 'clasico' ? 120 : 200;
             const container = document.getElementById('formPagoContainer');
             container.innerHTML = `
                 <div class="glass-card p-6 max-w-2xl mx-auto">
                     <h3 class="text-2xl font-bold mb-6">Pago plan ${plan === 'clasico' ? '⚜️ Clásico' : '💎 Premium'}</h3>
+                    
                     <div class="grid md:grid-cols-2 gap-4 mb-6">
                         <div class="bg-white/10 rounded-xl p-4">
-                            <h4 class="font-bold mb-2"><i class="fas fa-credit-card mr-2"></i>Transferencia</h4>
+                            <h4 class="font-bold mb-2 flex items-center gap-2"><i class="fas fa-university"></i> BPA</h4>
                             <p class="font-mono text-sm break-all">9248-1299-7027-1730</p>
                             <p class="text-xs mt-1">Confirmación: 63806513</p>
-                            <p class="text-xs mt-1">Monto: ${plan === 'clasico' ? '200' : '350'} CUP</p>
+                            <p class="text-xs mt-1 font-bold">Monto: ${montoTarjeta} CUP</p>
                         </div>
                         <div class="bg-white/10 rounded-xl p-4">
-                            <h4 class="font-bold mb-2"><i class="fas fa-mobile-alt mr-2"></i>Saldo móvil</h4>
+                            <h4 class="font-bold mb-2 flex items-center gap-2"><i class="fas fa-university"></i> METRO</h4>
+                            <p class="font-mono text-sm break-all">9238959871181386</p>
+                            <p class="text-xs mt-1">Confirmación: 63806513</p>
+                            <p class="text-xs mt-1 font-bold">Monto: ${montoTarjeta} CUP</p>
+                        </div>
+                        <div class="bg-white/10 rounded-xl p-4">
+                            <h4 class="font-bold mb-2 flex items-center gap-2"><i class="fas fa-mobile-alt"></i> Monedero</h4>
                             <p class="font-mono text-sm">63806513</p>
-                            <p class="text-xs mt-1">Monto: ${plan === 'clasico' ? '120' : '200'} CUP</p>
+                            <p class="text-xs mt-1">(mismos precios que tarjeta)</p>
+                            <p class="text-xs mt-1 font-bold">Monto: ${montoTarjeta} CUP</p>
+                        </div>
+                        <div class="bg-white/10 rounded-xl p-4">
+                            <h4 class="font-bold mb-2 flex items-center gap-2"><i class="fas fa-sim-card"></i> Saldo móvil</h4>
+                            <p class="font-mono text-sm">63806513</p>
+                            <p class="text-xs mt-1 font-bold">Monto: ${montoSaldo} CUP</p>
                         </div>
                     </div>
+
                     <select id="metodoPago" class="w-full p-3 rounded-xl bg-white/10 border border-white/20 mb-4">
-                        <option value="tarjeta">Transferencia bancaria</option>
+                        <option value="tarjeta">Transferencia bancaria (BPA/METRO/Monedero)</option>
                         <option value="saldo">Saldo móvil</option>
                     </select>
+
                     <input type="file" id="captura" accept="image/*" class="w-full p-2 rounded-xl bg-white/10 border border-white/20 mb-4">
+
                     <button onclick="enviarCaptura('${plan}')" class="btn-primary w-full">
                         <i class="fas fa-upload mr-2"></i>Enviar comprobante
                     </button>
@@ -317,7 +333,8 @@
                     alert('✅ Solicitud enviada. Espera la aprobación del administrador.');
                     document.getElementById('formPagoContainer').innerHTML = '';
                 } else {
-                    alert('❌ Error al enviar');
+                    const error = await res.json();
+                    alert('❌ Error al enviar: ' + (error.error || 'desconocido'));
                 }
             };
             reader.readAsDataURL(file);
@@ -398,11 +415,9 @@
                     <div id="adminContent" class="space-y-4"></div>
                 </div>
             `;
-            // Cargar solicitudes por defecto
             cargarSolicitudes();
         }
 
-        // Función para activar pestaña visualmente
         function setActiveTab(tabId) {
             ['tabSolicitudes', 'tabUsuarios', 'tabCatalogo'].forEach(id => {
                 const btn = document.getElementById(id);
@@ -415,38 +430,43 @@
         // ===== SOLICITUDES =====
         async function cargarSolicitudes() {
             setActiveTab('tabSolicitudes');
-            const res = await fetch(API_BASE + '/api/pending-requests', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ telegram_id: TELEGRAM_ID })
-            });
-            if (!res.ok) {
-                document.getElementById('adminContent').innerHTML = '<p class="text-red-400">No autorizado</p>';
-                return;
-            }
-            const solicitudes = await res.json();
-            const adminDiv = document.getElementById('adminContent');
-            if (!solicitudes.length) {
-                adminDiv.innerHTML = '<p class="text-center py-8">No hay solicitudes pendientes.</p>';
-                return;
-            }
-            adminDiv.innerHTML = solicitudes.map(s => `
-                <div class="glass-card p-4">
-                    <div class="flex flex-wrap gap-4 items-start justify-between">
-                        <div>
-                            <p><strong>Usuario:</strong> ${s.telegram_id}</p>
-                            <p><strong>Plan:</strong> ${s.plan_solicitado}</p>
-                            <p><strong>Método:</strong> ${s.metodo_pago}</p>
-                            <p><strong>Fecha:</strong> ${new Date(s.created_at).toLocaleString()}</p>
+            try {
+                const res = await fetch(API_BASE + '/api/pending-requests', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ telegram_id: TELEGRAM_ID })
+                });
+                if (!res.ok) {
+                    const error = await res.json();
+                    document.getElementById('adminContent').innerHTML = `<p class="text-red-400">Error: ${error.error || 'No autorizado'}</p>`;
+                    return;
+                }
+                const solicitudes = await res.json();
+                const adminDiv = document.getElementById('adminContent');
+                if (!solicitudes.length) {
+                    adminDiv.innerHTML = '<p class="text-center py-8">No hay solicitudes pendientes.</p>';
+                    return;
+                }
+                adminDiv.innerHTML = solicitudes.map(s => `
+                    <div class="glass-card p-4">
+                        <div class="flex flex-wrap gap-4 items-start justify-between">
+                            <div>
+                                <p><strong>Usuario:</strong> ${s.telegram_id}</p>
+                                <p><strong>Plan:</strong> ${s.plan_solicitado}</p>
+                                <p><strong>Método:</strong> ${s.metodo_pago}</p>
+                                <p><strong>Fecha:</strong> ${new Date(s.created_at).toLocaleString()}</p>
+                            </div>
+                            <img src="${s.captura_url}" class="h-24 rounded-lg object-cover">
                         </div>
-                        <img src="${s.captura_url}" class="h-24 rounded-lg object-cover">
+                        <div class="flex gap-2 mt-4">
+                            <button onclick="aprobarSolicitud('${s.id}')" class="btn-primary">Aprobar</button>
+                            <button onclick="rechazarSolicitud('${s.id}')" class="btn-secondary">Rechazar</button>
+                        </div>
                     </div>
-                    <div class="flex gap-2 mt-4">
-                        <button onclick="aprobarSolicitud('${s.id}')" class="btn-primary">Aprobar</button>
-                        <button onclick="rechazarSolicitud('${s.id}')" class="btn-secondary">Rechazar</button>
-                    </div>
-                </div>
-            `).join('');
+                `).join('');
+            } catch (e) {
+                document.getElementById('adminContent').innerHTML = '<p class="text-red-400">Error al cargar solicitudes</p>';
+            }
         }
 
         async function aprobarSolicitud(id) {
@@ -493,7 +513,7 @@
                 const usuarios = await res.json();
                 renderUsuarios(usuarios);
             } catch (e) {
-                document.getElementById('adminContent').innerHTML = '<p class="text-center py-8">Error al cargar usuarios. Verifica que el endpoint /api/users esté implementado.</p>';
+                document.getElementById('adminContent').innerHTML = '<p class="text-center py-8">Error al cargar usuarios.</p>';
             }
         }
 
@@ -547,7 +567,7 @@
                 html += '</div>';
                 document.getElementById('adminContent').innerHTML = html;
             } catch (e) {
-                document.getElementById('adminContent').innerHTML = '<p class="text-center py-8">Error al cargar catálogo. Verifica que el endpoint /api/catalogo-admin esté implementado.</p>';
+                document.getElementById('adminContent').innerHTML = '<p class="text-center py-8">Error al cargar catálogo.</p>';
             }
         }
 
