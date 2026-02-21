@@ -81,6 +81,37 @@
             font-weight: 600;
             background: rgba(255, 255, 255, 0.1);
         }
+        .tab {
+            padding: 10px 20px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab.active {
+            background: rgba(59, 130, 246, 0.3);
+            border: 1px solid #3b82f6;
+        }
+        .view-toggle {
+            display: flex;
+            gap: 8px;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(8px);
+            padding: 8px 12px;
+            border-radius: 40px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .view-toggle button {
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .view-toggle button.active {
+            background: #3b82f6;
+            color: white;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -90,8 +121,16 @@
             <h1 class="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-blue-400 to-purple-400 text-transparent bg-clip-text">
                 🎬 CineBot
             </h1>
-            <div id="userDisplay" class="glass-card px-6 py-3 text-sm">
+            <div id="userDisplay" class="glass-card px-6 py-3 text-sm flex items-center gap-3">
                 <i class="fas fa-spinner fa-pulse mr-2"></i>Cargando...
+            </div>
+        </div>
+
+        <!-- Toggle de vista para admins (oculto por defecto) -->
+        <div id="viewToggleContainer" class="flex justify-end mb-4 hidden">
+            <div class="view-toggle">
+                <button id="viewAdminBtn" onclick="setViewMode('admin')" class="active">👑 Admin</button>
+                <button id="viewUserBtn" onclick="setViewMode('user')">👤 Usuario</button>
             </div>
         </div>
 
@@ -107,7 +146,9 @@
         const TELEGRAM_ID = urlParams.get('tg_id');
 
         let usuario = null;
-        let solicitudesPendientes = [];
+        let viewMode = 'admin'; // 'admin' o 'user'
+        let currentPageCatalogo = 1;
+        let currentSearchCatalogo = '';
 
         // ========== FUNCIONES ==========
         async function identificarUsuario() {
@@ -131,11 +172,24 @@
                 });
                 const data = await res.json();
                 usuario = { id: TELEGRAM_ID, ...data };
+                
+                // Si es admin, mostrar el toggle de vista
+                if (usuario.es_admin) {
+                    document.getElementById('viewToggleContainer').classList.remove('hidden');
+                }
+                
                 actualizarUI();
             } catch (e) {
                 console.error(e);
                 document.getElementById('mainContent').innerHTML = '<p class="glass-card p-8 text-center">Error de conexión</p>';
             }
+        }
+
+        function setViewMode(mode) {
+            viewMode = mode;
+            document.getElementById('viewAdminBtn').classList.toggle('active', mode === 'admin');
+            document.getElementById('viewUserBtn').classList.toggle('active', mode === 'user');
+            actualizarUI();
         }
 
         function actualizarUI() {
@@ -153,15 +207,21 @@
                 `;
             }
 
-            if (usuario.es_admin) {
+            // Si es admin y está en modo admin, mostrar panel admin
+            if (usuario.es_admin && viewMode === 'admin') {
                 mostrarPanelAdmin();
-            } else if (usuario.activo) {
-                mostrarCatalogo();
-            } else {
-                mostrarPlanes();
+            } 
+            // Si no es admin o está en modo usuario, mostrar vista de usuario
+            else {
+                if (usuario.activo) {
+                    mostrarCatalogo();
+                } else {
+                    mostrarPlanes();
+                }
             }
         }
 
+        // ========== VISTA DE PLANES (para usuarios no activos) ==========
         function mostrarPlanes() {
             document.getElementById('mainContent').innerHTML = `
                 <div class="glass-card p-8">
@@ -217,6 +277,7 @@
                             <h4 class="font-bold mb-2"><i class="fas fa-credit-card mr-2"></i>Transferencia</h4>
                             <p class="font-mono text-sm break-all">9248-1299-7027-1730</p>
                             <p class="text-xs mt-1">Confirmación: 63806513</p>
+                            <p class="text-xs mt-1">Monto: ${plan === 'clasico' ? '200' : '350'} CUP</p>
                         </div>
                         <div class="bg-white/10 rounded-xl p-4">
                             <h4 class="font-bold mb-2"><i class="fas fa-mobile-alt mr-2"></i>Saldo móvil</h4>
@@ -262,6 +323,7 @@
             reader.readAsDataURL(file);
         }
 
+        // ========== CATÁLOGO PARA USUARIOS ACTIVOS ==========
         function mostrarCatalogo() {
             document.getElementById('mainContent').innerHTML = `
                 <div class="glass-card p-8">
@@ -285,7 +347,10 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ telegram_id: TELEGRAM_ID, page, search })
             });
-            if (!res.ok) return alert('No tienes suscripción activa');
+            if (!res.ok) {
+                alert('No tienes suscripción activa');
+                return;
+            }
             const data = await res.json();
             const grid = document.getElementById('catalogoGrid');
             if (!data.data.length) {
@@ -318,34 +383,51 @@
             else alert('❌ Error al enviar');
         }
 
-        // ========== PANEL ADMIN ==========
-        async function mostrarPanelAdmin() {
+        // ========== PANEL DE ADMINISTRACIÓN ==========
+        function mostrarPanelAdmin() {
             document.getElementById('mainContent').innerHTML = `
                 <div class="glass-card p-8">
                     <h2 class="text-3xl font-bold mb-6 flex items-center gap-2">
                         <i class="fas fa-crown text-yellow-400"></i> Panel de Administración
                     </h2>
-                    <div class="flex gap-4 mb-6">
-                        <button onclick="cargarSolicitudes()" class="btn-secondary"><i class="fas fa-clock mr-2"></i>Solicitudes</button>
-                        <button onclick="cargarUsuarios()" class="btn-secondary"><i class="fas fa-users mr-2"></i>Usuarios</button>
+                    <div class="flex gap-4 mb-6 flex-wrap">
+                        <button onclick="cargarSolicitudes()" class="btn-secondary" id="tabSolicitudes">📋 Solicitudes</button>
+                        <button onclick="cargarUsuarios()" class="btn-secondary" id="tabUsuarios">👥 Usuarios</button>
+                        <button onclick="cargarCatalogoAdmin()" class="btn-secondary" id="tabCatalogo">🎬 Catálogo</button>
                     </div>
                     <div id="adminContent" class="space-y-4"></div>
                 </div>
             `;
+            // Cargar solicitudes por defecto
             cargarSolicitudes();
         }
 
+        // Función para activar pestaña visualmente
+        function setActiveTab(tabId) {
+            ['tabSolicitudes', 'tabUsuarios', 'tabCatalogo'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.classList.remove('bg-white/20');
+            });
+            const activeBtn = document.getElementById(tabId);
+            if (activeBtn) activeBtn.classList.add('bg-white/20');
+        }
+
+        // ===== SOLICITUDES =====
         async function cargarSolicitudes() {
+            setActiveTab('tabSolicitudes');
             const res = await fetch(API_BASE + '/api/pending-requests', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ telegram_id: TELEGRAM_ID })
             });
-            if (!res.ok) return alert('No autorizado');
+            if (!res.ok) {
+                document.getElementById('adminContent').innerHTML = '<p class="text-red-400">No autorizado</p>';
+                return;
+            }
             const solicitudes = await res.json();
             const adminDiv = document.getElementById('adminContent');
             if (!solicitudes.length) {
-                adminDiv.innerHTML = '<p>No hay solicitudes pendientes.</p>';
+                adminDiv.innerHTML = '<p class="text-center py-8">No hay solicitudes pendientes.</p>';
                 return;
             }
             adminDiv.innerHTML = solicitudes.map(s => `
@@ -357,40 +439,149 @@
                             <p><strong>Método:</strong> ${s.metodo_pago}</p>
                             <p><strong>Fecha:</strong> ${new Date(s.created_at).toLocaleString()}</p>
                         </div>
-                        <img src="${s.captura_url}" class="h-24 rounded-lg">
+                        <img src="${s.captura_url}" class="h-24 rounded-lg object-cover">
                     </div>
                     <div class="flex gap-2 mt-4">
-                        <button onclick="aprobar('${s.id}')" class="btn-primary">Aprobar</button>
-                        <button onclick="rechazar('${s.id}')" class="btn-secondary">Rechazar</button>
+                        <button onclick="aprobarSolicitud('${s.id}')" class="btn-primary">Aprobar</button>
+                        <button onclick="rechazarSolicitud('${s.id}')" class="btn-secondary">Rechazar</button>
                     </div>
                 </div>
             `).join('');
         }
 
-        async function aprobar(id) {
+        async function aprobarSolicitud(id) {
             if (!confirm('¿Aprobar esta solicitud?')) return;
-            await fetch(API_BASE + '/api/approve-request', {
+            const res = await fetch(API_BASE + '/api/approve-request', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ admin_id: TELEGRAM_ID, solicitud_id: id })
             });
-            cargarSolicitudes();
+            if (res.ok) {
+                alert('Solicitud aprobada');
+                cargarSolicitudes();
+            } else {
+                alert('Error al aprobar');
+            }
         }
 
-        async function rechazar(id) {
+        async function rechazarSolicitud(id) {
             const motivo = prompt('Motivo del rechazo:');
             if (!motivo) return;
-            await fetch(API_BASE + '/api/reject-request', {
+            const res = await fetch(API_BASE + '/api/reject-request', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ admin_id: TELEGRAM_ID, solicitud_id: id, motivo })
             });
-            cargarSolicitudes();
+            if (res.ok) {
+                alert('Solicitud rechazada');
+                cargarSolicitudes();
+            } else {
+                alert('Error al rechazar');
+            }
         }
 
+        // ===== USUARIOS =====
         async function cargarUsuarios() {
-            // Implementación básica (puedes expandir)
-            alert('Funcionalidad de usuarios en desarrollo');
+            setActiveTab('tabUsuarios');
+            try {
+                const res = await fetch(API_BASE + '/api/users', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ admin_id: TELEGRAM_ID })
+                });
+                if (!res.ok) throw new Error('No autorizado');
+                const usuarios = await res.json();
+                renderUsuarios(usuarios);
+            } catch (e) {
+                document.getElementById('adminContent').innerHTML = '<p class="text-center py-8">Error al cargar usuarios. Verifica que el endpoint /api/users esté implementado.</p>';
+            }
+        }
+
+        function renderUsuarios(usuarios) {
+            const adminDiv = document.getElementById('adminContent');
+            if (!usuarios.length) {
+                adminDiv.innerHTML = '<p class="text-center py-8">No hay usuarios registrados.</p>';
+                return;
+            }
+            adminDiv.innerHTML = usuarios.map(u => {
+                const expiracion = u.fecha_expiracion ? new Date(u.fecha_expiracion).toLocaleDateString() : 'N/A';
+                const diasRestantes = u.fecha_expiracion ? Math.ceil((new Date(u.fecha_expiracion) - new Date()) / (1000*60*60*24)) : 0;
+                return `
+                <div class="glass-card p-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p><strong>ID:</strong> ${u.telegram_id}</p>
+                            <p><strong>Plan:</strong> ${u.plan === 'clasico' ? '⚜️ Clásico' : '💎 Premium'}</p>
+                            <p><strong>Expira:</strong> ${expiracion}</p>
+                            <p><strong>Días restantes:</strong> ${diasRestantes}</p>
+                        </div>
+                        <span class="badge">${diasRestantes > 0 ? 'Activo' : 'Inactivo'}</span>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        // ===== CATÁLOGO ADMIN =====
+        async function cargarCatalogoAdmin() {
+            setActiveTab('tabCatalogo');
+            try {
+                const res = await fetch(API_BASE + '/api/catalogo-admin', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ admin_id: TELEGRAM_ID })
+                });
+                if (!res.ok) throw new Error('No autorizado');
+                const data = await res.json();
+                let html = '<div class="mb-4"><button onclick="mostrarFormAgregarPelicula()" class="btn-primary"><i class="fas fa-plus mr-2"></i>Agregar película</button></div>';
+                html += '<div id="formAgregarPelicula" class="hidden mb-4"></div>';
+                html += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
+                data.data.forEach(p => {
+                    html += `
+                        <div class="glass-card p-4">
+                            <h3 class="font-bold">${p.titulo}</h3>
+                            <p class="text-xs opacity-60">Message ID: ${p.message_id}</p>
+                            <p class="text-xs opacity-60">ID: ${p.id.substring(0,8)}</p>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                document.getElementById('adminContent').innerHTML = html;
+            } catch (e) {
+                document.getElementById('adminContent').innerHTML = '<p class="text-center py-8">Error al cargar catálogo. Verifica que el endpoint /api/catalogo-admin esté implementado.</p>';
+            }
+        }
+
+        function mostrarFormAgregarPelicula() {
+            const formDiv = document.getElementById('formAgregarPelicula');
+            formDiv.innerHTML = `
+                <div class="glass-card p-4">
+                    <h3 class="font-bold mb-4">Nueva película</h3>
+                    <input type="text" id="nuevoTitulo" placeholder="Título" class="w-full p-2 rounded-xl bg-white/10 border border-white/20 mb-2">
+                    <input type="number" id="nuevoMessageId" placeholder="Message ID" class="w-full p-2 rounded-xl bg-white/10 border border-white/20 mb-2">
+                    <div class="flex gap-2">
+                        <button onclick="agregarPelicula()" class="btn-primary">Guardar</button>
+                        <button onclick="document.getElementById('formAgregarPelicula').innerHTML=''; document.getElementById('formAgregarPelicula').classList.add('hidden')" class="btn-secondary">Cancelar</button>
+                    </div>
+                </div>
+            `;
+            formDiv.classList.remove('hidden');
+        }
+
+        async function agregarPelicula() {
+            const titulo = document.getElementById('nuevoTitulo').value;
+            const message_id = document.getElementById('nuevoMessageId').value;
+            if (!titulo || !message_id) return alert('Completa todos los campos');
+            const res = await fetch(API_BASE + '/api/add-movie', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ admin_id: TELEGRAM_ID, titulo, message_id: parseInt(message_id) })
+            });
+            if (res.ok) {
+                alert('Película agregada');
+                cargarCatalogoAdmin();
+            } else {
+                alert('Error al agregar');
+            }
         }
 
         // Iniciar
