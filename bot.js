@@ -37,6 +37,7 @@ async function obtenerUsuario(telegramId) {
     .select('*')
     .eq('telegram_id', telegramId)
     .single();
+  if (error && error.code !== 'PGRST116') console.error('Error obteniendo usuario:', error);
   return data;
 }
 
@@ -73,10 +74,8 @@ function getMainKeyboard(userId, tieneSuscripcion) {
     one_time_keyboard: false
   };
 
-  // Añadir botón de WebApp (solo texto, sin enlace visible)
   keyboard.keyboard.push([{ text: '🌐 Abrir WebApp' }]);
 
-  // Si es admin, añadir panel (también abre webapp)
   if (esAdmin(userId)) {
     keyboard.keyboard.push([{ text: '⚙️ Panel Admin' }]);
   }
@@ -195,7 +194,6 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, ayuda, { parse_mode: 'Markdown' });
   }
   else if (text === '🌐 Abrir WebApp') {
-    // Envía un mensaje con el botón de webapp (sin enlace visible)
     const webAppButton = {
       text: 'Abrir WebApp',
       web_app: { url: `${WEBAPP_URL}?tg_id=${userId}` }
@@ -318,13 +316,24 @@ bot.on('photo', async (msg) => {
     const { data: urlData } = supabaseAdmin.storage.from('capturas').getPublicUrl(fileName);
     const publicUrl = urlData.publicUrl;
 
-    await supabaseAdmin.from('solicitudes_pago').insert({
-      telegram_id: userId,
-      plan_solicitado: plan,
-      metodo_pago: 'desconocido',
-      captura_url: publicUrl,
-      estado: 'pendiente'
-    });
+    // Insertar solicitud en la base de datos
+    const { data: insertData, error: insertError } = await supabaseAdmin
+      .from('solicitudes_pago')
+      .insert({
+        telegram_id: userId,
+        plan_solicitado: plan,
+        metodo_pago: 'desconocido',
+        captura_url: publicUrl,
+        estado: 'pendiente'
+      })
+      .select();
+
+    if (insertError) {
+      console.error('Error insertando solicitud:', insertError);
+      throw insertError;
+    }
+
+    console.log('Solicitud insertada correctamente:', insertData);
 
     bot.sendMessage(chatId,
       '✅ **¡Solicitud recibida!**\n\n' +
@@ -333,7 +342,7 @@ bot.on('photo', async (msg) => {
       { parse_mode: 'Markdown' }
     );
 
-    // Notificar a admins (sin enlaces visibles, solo texto)
+    // Notificar a admins
     for (const adminId of ADMIN_IDS) {
       try {
         bot.sendMessage(adminId,
@@ -369,13 +378,18 @@ bot.onText(/\/addpelicula (.+)/, async (msg, match) => {
     return;
   }
 
-  await supabaseAdmin.from('peliculas').insert({
+  const { error } = await supabaseAdmin.from('peliculas').insert({
     titulo,
     message_id: replied.message_id,
     canal_id: CHANNEL_ID
   });
 
-  bot.sendMessage(msg.chat.id, `✅ Película '${titulo}' agregada correctamente.`);
+  if (error) {
+    console.error('Error agregando película:', error);
+    bot.sendMessage(msg.chat.id, '❌ Error al agregar la película.');
+  } else {
+    bot.sendMessage(msg.chat.id, `✅ Película '${titulo}' agregada correctamente.`);
+  }
 });
 
 bot.onText(/\/panel/, async (msg) => {
@@ -427,13 +441,20 @@ app.post('/api/submit-payment', async (req, res) => {
     const { data: urlData } = supabaseAdmin.storage.from('capturas').getPublicUrl(fileName);
     const publicUrl = urlData.publicUrl;
 
-    await supabaseAdmin.from('solicitudes_pago').insert({
-      telegram_id: parseInt(telegram_id),
-      plan_solicitado: plan,
-      metodo_pago: metodo,
-      captura_url: publicUrl,
-      estado: 'pendiente'
-    });
+    const { data: insertData, error: insertError } = await supabaseAdmin
+      .from('solicitudes_pago')
+      .insert({
+        telegram_id: parseInt(telegram_id),
+        plan_solicitado: plan,
+        metodo_pago: metodo,
+        captura_url: publicUrl,
+        estado: 'pendiente'
+      })
+      .select();
+
+    if (insertError) throw insertError;
+
+    console.log('Solicitud desde webapp insertada:', insertData);
     res.json({ success: true });
   } catch (e) {
     console.error('Error en submit-payment:', e);
@@ -568,8 +589,6 @@ app.post('/api/request-movie', async (req, res) => {
     res.status(500).json({ error: 'Error al enviar' });
   }
 });
-
-// ================= NUEVOS ENDPOINTS PARA ADMIN =================
 
 // Obtener lista de todos los usuarios (solo admin)
 app.post('/api/users', async (req, res) => {
