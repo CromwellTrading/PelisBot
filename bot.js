@@ -63,18 +63,20 @@ app.post('/webhook', (req, res) => {
   res.sendStatus(200);
 });
 
+// Estado para búsqueda: guardamos qué usuarios están esperando ingresar un nombre
+const searchState = new Map(); // userId -> true
+
 // ================= FUNCIÓN PARA TECLADO PRINCIPAL =================
 function getMainKeyboard(userId, tieneSuscripcion) {
   const keyboard = {
     keyboard: [
-      [{ text: '🎬 Ver planes' }, { text: '❓ Ayuda' }],
+      [{ text: '🔍 Buscar' }, { text: '🎬 Ver planes' }, { text: '❓ Ayuda' }],
       [{ text: '👤 Mi perfil' }]
     ],
     resize_keyboard: true,
     one_time_keyboard: false
   };
 
-  // Solo un botón para webapp
   keyboard.keyboard.push([{ text: '🌐 Abrir WebApp' }]);
 
   return keyboard;
@@ -103,9 +105,8 @@ bot.onText(/\/start/, async (msg) => {
       `   📅 Activo hasta: ${expiracion.toLocaleDateString()}\n` +
       `   ⏳ Días restantes: ${diasRestantes}\n\n` +
       `🔍 **¿Cómo buscar?**\n` +
-      `   • Presiona el botón "🎬 Ver planes" para ver opciones (si quieres renovar).\n` +
-      `   • Usa el botón **"🌐 Abrir WebApp"** para acceder al catálogo completo.\n` +
-      `   • También puedes escribir el nombre de una película directamente aquí.\n\n` +
+      `   • Presiona el botón **"🔍 Buscar"** y luego escribe el nombre.\n` +
+      `   • También puedes usar la **webapp** para una experiencia mejorada.\n\n` +
       `🎉 Disfruta de tu experiencia VIP.`;
 
     bot.sendMessage(chatId, mensaje, { 
@@ -133,14 +134,33 @@ bot.onText(/\/start/, async (msg) => {
   }
 });
 
-// Manejo de mensajes de texto (botones del teclado)
+// Manejo de mensajes de texto (botones del teclado y búsqueda)
 bot.on('message', async (msg) => {
+  // Ignorar mensajes sin texto (fotos, stickers, etc.)
+  if (!msg.text) return;
+
   const chatId = msg.chat.id;
   const text = msg.text;
   const userId = msg.from.id;
   const usuario = await obtenerUsuario(userId);
   const activo = await usuarioActivo(userId);
 
+  // Comandos (empiezan con '/') se ignoran aquí (ya tienen su propio handler)
+  if (text.startsWith('/')) return;
+
+  // Botón "🔍 Buscar"
+  if (text === '🔍 Buscar') {
+    if (!activo) {
+      bot.sendMessage(chatId, '❌ No tienes una suscripción activa. Usa "🎬 Ver planes" para adquirir una.');
+      return;
+    }
+    // Activar estado de búsqueda
+    searchState.set(userId, true);
+    bot.sendMessage(chatId, '✍️ Escribe el nombre de la película que deseas buscar:');
+    return;
+  }
+
+  // Botón "🎬 Ver planes"
   if (text === '🎬 Ver planes') {
     const mensaje = 
       '📋 **Planes disponibles**\n\n' +
@@ -166,8 +186,11 @@ bot.on('message', async (msg) => {
       parse_mode: 'Markdown',
       reply_markup: inlineKeyboard 
     });
+    return;
   }
-  else if (text === '👤 Mi perfil') {
+
+  // Botón "👤 Mi perfil"
+  if (text === '👤 Mi perfil') {
     if (!activo) {
       bot.sendMessage(chatId, '❌ No tienes una suscripción activa. Usa "🎬 Ver planes" para adquirir una.');
       return;
@@ -179,13 +202,27 @@ bot.on('message', async (msg) => {
       `Plan: **${usuario.plan === 'clasico' ? '⚜️ Clásico' : '💎 Premium'}**\n` +
       `📅 Activo hasta: ${expiracion.toLocaleDateString()}\n` +
       `⏳ Días restantes: ${diasRestantes}\n\n` +
-      `🔍 **Buscar películas:**\n` +
-      `   • Escribe el nombre directamente aquí.\n` +
-      `   • Usa la webapp para una experiencia mejorada.\n\n` +
       `¿Quieres renovar? Usa "🎬 Ver planes".`;
     bot.sendMessage(chatId, mensaje, { parse_mode: 'Markdown' });
+    return;
   }
-  else if (text === '🌐 Abrir WebApp') {
+
+  // Botón "❓ Ayuda"
+  if (text === '❓ Ayuda') {
+    const ayuda = 
+      '❓ **Ayuda**\n\n' +
+      '• Para comprar un plan, usa "🎬 Ver planes".\n' +
+      '• Luego de pagar, envía la captura.\n' +
+      '• Los administradores aprobarán tu pago.\n' +
+      '• Una vez activo, podrás buscar películas con "🔍 Buscar".\n' +
+      '• Usa "👤 Mi perfil" para ver tu estado.\n\n' +
+      '¿Dudas? Contacta a un administrador.';
+    bot.sendMessage(chatId, ayuda, { parse_mode: 'Markdown' });
+    return;
+  }
+
+  // Botón "🌐 Abrir WebApp"
+  if (text === '🌐 Abrir WebApp') {
     const webAppButton = {
       text: 'Abrir WebApp',
       web_app: { url: `${WEBAPP_URL}?tg_id=${userId}` }
@@ -196,48 +233,42 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, 'Haz clic para abrir la webapp:', {
       reply_markup: keyboard
     });
+    return;
   }
-  else if (text === '❓ Ayuda') {
-    const ayuda = 
-      '❓ **Ayuda**\n\n' +
-      '• Para comprar un plan, usa "🎬 Ver planes".\n' +
-      '• Luego de pagar, envía la captura.\n' +
-      '• Los administradores aprobarán tu pago.\n' +
-      '• Una vez activo, podrás buscar películas.\n' +
-      '• Usa "👤 Mi perfil" para ver tu estado.\n\n' +
-      '¿Dudas? Contacta a un administrador.';
-    bot.sendMessage(chatId, ayuda, { parse_mode: 'Markdown' });
-  }
-  else {
-    // Si el usuario está activo y escribe algo, lo tratamos como búsqueda
-    if (activo) {
-      await buscarPeliculaPorTexto(chatId, userId, text);
-    }
-  }
-});
 
-// Función para buscar película por texto (desde mensaje directo)
-async function buscarPeliculaPorTexto(chatId, userId, query) {
-  if (query.length < 3) {
-    bot.sendMessage(chatId, '🔍 Escribe al menos 3 caracteres para buscar.');
+  // Si el usuario está en modo búsqueda, procesamos el texto como nombre de película
+  if (searchState.get(userId)) {
+    searchState.delete(userId); // Limpiar estado
+    if (!activo) {
+      bot.sendMessage(chatId, '❌ Tu suscripción ya no está activa. Usa "🎬 Ver planes" para renovar.');
+      return;
+    }
+    if (text.length < 3) {
+      bot.sendMessage(chatId, '🔍 Escribe al menos 3 caracteres para buscar.');
+      return;
+    }
+    // Realizar búsqueda
+    const { data, error } = await supabaseAdmin
+      .from('peliculas')
+      .select('*')
+      .ilike('titulo', `%${text}%`)
+      .limit(10);
+    if (error || !data.length) {
+      bot.sendMessage(chatId, `😕 No encontré ninguna película con "${text}".`);
+      return;
+    }
+    const inlineKeyboard = {
+      inline_keyboard: data.map(p => [{ text: p.titulo, callback_data: `pelicula_${p.id}` }])
+    };
+    bot.sendMessage(chatId, `🎥 Resultados para "${text}":`, {
+      reply_markup: inlineKeyboard
+    });
     return;
   }
-  const { data, error } = await supabaseAdmin
-    .from('peliculas')
-    .select('*')
-    .ilike('titulo', `%${query}%`)
-    .limit(10);
-  if (error || !data.length) {
-    bot.sendMessage(chatId, `😕 No encontré ninguna película con "${query}".`);
-    return;
-  }
-  const inlineKeyboard = {
-    inline_keyboard: data.map(p => [{ text: p.titulo, callback_data: `pelicula_${p.id}` }])
-  };
-  bot.sendMessage(chatId, `🎥 Resultados para "${query}":`, {
-    reply_markup: inlineKeyboard
-  });
-}
+
+  // Si llegamos aquí, el mensaje no es un botón ni búsqueda activa, lo ignoramos
+  // (opcionalmente podríamos enviar un mensaje de ayuda)
+});
 
 // Callbacks de botones inline (planes y películas)
 bot.on('callback_query', async (callbackQuery) => {
