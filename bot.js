@@ -56,48 +56,35 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'webapp')));
 
-// Endpoint para el webhook de Telegram
+// Endpoint para el webhook
 app.post('/webhook', (req, res) => {
   bot.processUpdate(req.body);
   res.sendStatus(200);
 });
 
-// ================= HANDLERS DEL BOT =================
-
-// Función para obtener el teclado de reply según el estado del usuario
-function getReplyKeyboard(userId, usuario, activo) {
-  const isAdmin = esAdmin(userId);
-  const webAppButton = {
-    text: '🌐 Abrir WebApp',
-    web_app: { url: `${WEBAPP_URL}?tg_id=${userId}` }
-  };
-
-  // Botones base
-  let buttons = [
-    [{ text: '🎬 Planes' }, { text: '❓ Ayuda' }],
-    [{ text: '👤 Mi Perfil' }, { text: '🔐 Wireguard VPN' }]
-  ];
-
-  if (activo) {
-    buttons.push([{ text: '🏠 Inicio' }]);
-  } else {
-    buttons.push([{ text: '🏠 Inicio' }]);
-  }
-
-  // Añadir botón de webapp
-  buttons.push([webAppButton]);
-
-  // Si es admin, un botón extra (opcional, también abre webapp)
-  if (isAdmin) {
-    buttons.push([{ text: '⚙️ Admin Panel', web_app: { url: `${WEBAPP_URL}?tg_id=${userId}` } }]);
-  }
-
-  return {
-    keyboard: buttons,
+// ================= FUNCIÓN PARA TECLADO PRINCIPAL =================
+function getMainKeyboard(userId, tieneSuscripcion) {
+  const keyboard = {
+    keyboard: [
+      [{ text: '🎬 Ver planes' }, { text: '❓ Ayuda' }],
+      [{ text: '👤 Mi perfil' }, { text: '🔐 Wireguard VPN' }]
+    ],
     resize_keyboard: true,
     one_time_keyboard: false
   };
+
+  // Añadir botón de WebApp (solo texto, sin enlace visible)
+  keyboard.keyboard.push([{ text: '🌐 Abrir WebApp' }]);
+
+  // Si es admin, añadir panel (también abre webapp)
+  if (esAdmin(userId)) {
+    keyboard.keyboard.push([{ text: '⚙️ Panel Admin' }]);
+  }
+
+  return keyboard;
 }
+
+// ================= HANDLERS DEL BOT =================
 
 // Comando /start
 bot.onText(/\/start/, async (msg) => {
@@ -108,40 +95,43 @@ bot.onText(/\/start/, async (msg) => {
   const usuario = await obtenerUsuario(userId);
   const activo = await usuarioActivo(userId);
 
-  const replyKeyboard = getReplyKeyboard(userId, usuario, activo);
+  const keyboard = getMainKeyboard(userId, activo);
 
-  if (usuario && activo) {
+  if (activo) {
     const expiracion = new Date(usuario.fecha_expiracion);
     const diasRestantes = Math.ceil((expiracion - new Date()) / (1000 * 60 * 60 * 24));
-    let mensaje = `✨ ¡Bienvenido de nuevo, ${firstName}! ✨\n\n`;
-    mensaje += `🎬 Tu suscripción **${usuario.plan === 'clasico' ? 'Clásica' : 'Premium'}** está activa.\n`;
-    mensaje += `📅 Días restantes: ${diasRestantes}\n\n`;
-    mensaje += 'Usa los botones de abajo para navegar.';
+    const mensaje = 
+      `✨ ¡Hola de nuevo, ${firstName}! ✨\n\n` +
+      `Tu suscripción **${usuario.plan === 'clasico' ? '⚜️ Clásica' : '💎 Premium'}** está activa.\n` +
+      `⏳ Días restantes: ${diasRestantes}\n\n` +
+      `Usa los botones para explorar.`;
 
-    bot.sendMessage(chatId, mensaje, {
+    bot.sendMessage(chatId, mensaje, { 
       parse_mode: 'Markdown',
-      reply_markup: replyKeyboard
+      reply_markup: keyboard 
     });
   } else {
     const mensaje = 
-      '🍿 **¡Bienvenido al CineBot!** 🍿\n\n' +
-      '🎬 **Planes a tu medida:**\n\n' +
-      '⚜️ **Clásico** – 200 CUP (tarjeta) / 120 CUP (saldo)\n' +
-      '   • Disfruta del catálogo completo\n' +
-      '   • Sin opción de reenviar o guardar\n\n' +
-      '💎 **Premium** – 350 CUP (tarjeta) / 200 CUP (saldo)\n' +
-      '   • Todo lo del plan Clásico\n' +
-      '   • Puedes reenviar y guardar películas\n\n' +
-      '👇 Elige un plan desde el botón "🎬 Planes" y comienza a disfrutar.';
-    
-    bot.sendMessage(chatId, mensaje, {
+      `🍿 **CineBot - Tu cine personal** 🍿\n\n` +
+      `Para acceder al catálogo necesitas una suscripción.\n\n` +
+      `⚜️ **Clásico** — 200 CUP (tarjeta) / 120 CUP (saldo)\n` +
+      `   ✅ Catálogo completo\n` +
+      `   ✅ Visualización sin límites\n` +
+      `   ❌ No permite reenviar/guardar\n\n` +
+      `💎 **Premium** — 350 CUP (tarjeta) / 200 CUP (saldo)\n` +
+      `   ✅ Todo lo del plan Clásico\n` +
+      `   ✅ Reenvío y guardado de películas\n` +
+      `   ✅ Prioridad en solicitudes\n\n` +
+      `Presiona "🎬 Ver planes" para comenzar.`;
+
+    bot.sendMessage(chatId, mensaje, { 
       parse_mode: 'Markdown',
-      reply_markup: replyKeyboard
+      reply_markup: keyboard 
     });
   }
 });
 
-// Manejo de mensajes de texto (reply keyboard)
+// Manejo de mensajes de texto (botones del teclado)
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
@@ -149,9 +139,9 @@ bot.on('message', async (msg) => {
   const usuario = await obtenerUsuario(userId);
   const activo = await usuarioActivo(userId);
 
-  if (text === '🎬 Planes') {
+  if (text === '🎬 Ver planes') {
     const mensaje = 
-      '📋 **Nuestros planes**\n\n' +
+      '📋 **Planes disponibles**\n\n' +
       '⚜️ **Clásico**\n' +
       '   • Acceso al catálogo completo\n' +
       '   • Visualización sin límites\n' +
@@ -162,59 +152,76 @@ bot.on('message', async (msg) => {
       '   • Reenvío y guardado de películas\n' +
       '   • Prioridad en solicitudes\n' +
       '   • Precio: 350 CUP (tarjeta) / 200 CUP (saldo)\n\n' +
-      'Selecciona uno para pagar:';
+      'Elige uno para continuar:';
+    
     const inlineKeyboard = {
       inline_keyboard: [
         [{ text: '⚜️ Clásico', callback_data: 'plan_clasico' }],
         [{ text: '💎 Premium', callback_data: 'plan_premium' }]
       ]
     };
-    bot.sendMessage(chatId, mensaje, { parse_mode: 'Markdown', reply_markup: inlineKeyboard });
+    bot.sendMessage(chatId, mensaje, { 
+      parse_mode: 'Markdown',
+      reply_markup: inlineKeyboard 
+    });
   }
-  else if (text === '👤 Mi Perfil') {
-    if (!usuario || !activo) {
-      bot.sendMessage(chatId, '❌ No tienes una suscripción activa. Usa "🎬 Planes" para adquirir una.');
+  else if (text === '👤 Mi perfil') {
+    if (!activo) {
+      bot.sendMessage(chatId, '❌ No tienes una suscripción activa. Usa "🎬 Ver planes" para adquirir una.');
       return;
     }
     const expiracion = new Date(usuario.fecha_expiracion);
     const diasRestantes = Math.ceil((expiracion - new Date()) / (1000 * 60 * 60 * 24));
     const mensaje = 
       `👤 **Tu perfil**\n\n` +
-      `Plan: **${usuario.plan === 'clasico' ? 'Clásico ⚜️' : 'Premium 💎'}**\n` +
+      `Plan: **${usuario.plan === 'clasico' ? '⚜️ Clásico' : '💎 Premium'}**\n` +
       `📅 Activo hasta: ${expiracion.toLocaleDateString()}\n` +
       `⏳ Días restantes: ${diasRestantes}\n\n` +
-      `¿Quieres renovar? Usa el botón "🎬 Planes".`;
+      `¿Quieres renovar? Usa "🎬 Ver planes".`;
     bot.sendMessage(chatId, mensaje, { parse_mode: 'Markdown' });
   }
   else if (text === '🔐 Wireguard VPN') {
-    // Placeholder: puedes cambiar la URL o mensaje
-    bot.sendMessage(chatId, '🔐 Pronto tendremos información sobre Wireguard VPN. Por ahora, contacta a un administrador.');
+    bot.sendMessage(chatId, '🔐 El servicio Wireguard VPN estará disponible próximamente. Contacta a un administrador para más información.');
   }
   else if (text === '❓ Ayuda') {
     const ayuda = 
       '❓ **Ayuda**\n\n' +
-      '• Para comprar un plan, usa el botón "🎬 Planes".\n' +
-      '• Luego de pagar, envía la captura de pantalla.\n' +
+      '• Para comprar un plan, usa "🎬 Ver planes".\n' +
+      '• Luego de pagar, envía la captura.\n' +
       '• Los administradores aprobarán tu pago.\n' +
       '• Una vez activo, podrás buscar películas.\n' +
-      '• Usa "👤 Mi Perfil" para ver tu estado.\n\n' +
-      'Si tienes dudas, contacta a un administrador.';
+      '• Usa "👤 Mi perfil" para ver tu estado.\n\n' +
+      '¿Dudas? Contacta a un administrador.';
     bot.sendMessage(chatId, ayuda, { parse_mode: 'Markdown' });
   }
-  else if (text === '🏠 Inicio') {
-    // Simular /start
-    if (usuario && activo) {
-      const expiracion = new Date(usuario.fecha_expiracion);
-      const diasRestantes = Math.ceil((expiracion - new Date()) / (1000 * 60 * 60 * 24));
-      let mensaje = `✨ Bienvenido de nuevo. Tu suscripción **${usuario.plan}** está activa. Días restantes: ${diasRestantes}`;
-      bot.sendMessage(chatId, mensaje);
-    } else {
-      bot.sendMessage(chatId, '🍿 Usa /start para ver las opciones.');
-    }
+  else if (text === '🌐 Abrir WebApp') {
+    // Envía un mensaje con el botón de webapp (sin enlace visible)
+    const webAppButton = {
+      text: 'Abrir WebApp',
+      web_app: { url: `${WEBAPP_URL}?tg_id=${userId}` }
+    };
+    const keyboard = {
+      inline_keyboard: [[webAppButton]]
+    };
+    bot.sendMessage(chatId, 'Haz clic para abrir la webapp:', {
+      reply_markup: keyboard
+    });
+  }
+  else if (text === '⚙️ Panel Admin' && esAdmin(userId)) {
+    const webAppButton = {
+      text: 'Abrir Panel Admin',
+      web_app: { url: `${WEBAPP_URL}?tg_id=${userId}` }
+    };
+    const keyboard = {
+      inline_keyboard: [[webAppButton]]
+    };
+    bot.sendMessage(chatId, 'Panel de administración:', {
+      reply_markup: keyboard
+    });
   }
 });
 
-// Callbacks de botones inline (para planes y demás)
+// Callbacks de botones inline (planes)
 bot.on('callback_query', async (callbackQuery) => {
   const msg = callbackQuery.message;
   const data = callbackQuery.data;
@@ -227,23 +234,22 @@ bot.on('callback_query', async (callbackQuery) => {
     if (!global.userPlans) global.userPlans = new Map();
     global.userPlans.set(userId, plan);
 
-    const nombrePlan = plan === 'clasico' ? 'Clásico ⚜️' : 'Premium 💎';
+    const nombrePlan = plan === 'clasico' ? '⚜️ Clásico' : '💎 Premium';
     const montoTarjeta = plan === 'clasico' ? PRECIOS.tarjeta.clasico : PRECIOS.tarjeta.premium;
     const montoSaldo = plan === 'clasico' ? PRECIOS.saldo.clasico : PRECIOS.saldo.premium;
 
     const texto = 
-      `**Suscripción ${nombrePlan}**\n\n` +
+      `**${nombrePlan}**\n\n` +
       `🎬 Acceso ilimitado por 30 días.\n\n` +
-      `**Elige método de pago:**\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
-      `1️⃣ Transferencia bancaria 🇨🇺\n` +
-      `   💳 Tarjeta: \`9248-1299-7027-1730\`\n` +
-      `   📲 Confirmación: \`63806513\`\n` +
-      `   💵 Monto: ${montoTarjeta} CUP\n` +
+      `💳 **Transferencia bancaria**\n` +
+      `   Tarjeta: \`9248-1299-7027-1730\`\n` +
+      `   Confirmación: \`63806513\`\n` +
+      `   Monto: **${montoTarjeta} CUP**\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
-      `2️⃣ Saldo móvil 🇨🇺\n` +
-      `   📱 Número: \`63806513\`\n` +
-      `   💵 Monto: ${montoSaldo} CUP\n` +
+      `📱 **Saldo móvil**\n` +
+      `   Número: \`63806513\`\n` +
+      `   Monto: **${montoSaldo} CUP**\n` +
       `━━━━━━━━━━━━━━━━━━\n\n` +
       `📷 **Envía la captura del comprobante y tu cuenta se activará en minutos.**`;
 
@@ -261,18 +267,16 @@ bot.on('callback_query', async (callbackQuery) => {
   }
   else if (data === 'volver_planes') {
     const mensaje = 
-      '📋 **Nuestros planes**\n\n' +
-      '⚜️ **Clásico**\n' +
-      '   • Acceso al catálogo completo\n' +
-      '   • Visualización sin límites\n' +
-      '   • No permite reenviar/guardar\n' +
-      '   • Precio: 200 CUP (tarjeta) / 120 CUP (saldo)\n\n' +
-      '💎 **Premium**\n' +
-      '   • Todo lo del plan Clásico\n' +
-      '   • Reenvío y guardado de películas\n' +
-      '   • Prioridad en solicitudes\n' +
-      '   • Precio: 350 CUP (tarjeta) / 200 CUP (saldo)\n\n' +
-      'Selecciona uno para pagar:';
+      '📋 **Planes disponibles**\n\n' +
+      '⚜️ **Clásico** — 200 CUP (tarjeta) / 120 CUP (saldo)\n' +
+      '   ✅ Catálogo completo\n' +
+      '   ✅ Visualización sin límites\n' +
+      '   ❌ No permite reenviar/guardar\n\n' +
+      '💎 **Premium** — 350 CUP (tarjeta) / 200 CUP (saldo)\n' +
+      '   ✅ Todo lo del plan Clásico\n' +
+      '   ✅ Reenvío y guardado\n' +
+      '   ✅ Prioridad en solicitudes\n\n' +
+      'Selecciona:';
     const inlineKeyboard = {
       inline_keyboard: [
         [{ text: '⚜️ Clásico', callback_data: 'plan_clasico' }],
@@ -286,124 +290,15 @@ bot.on('callback_query', async (callbackQuery) => {
       reply_markup: inlineKeyboard
     });
   }
-  else if (data === 'buscar') {
-    bot.editMessageText(
-      '🔍 Escribe el nombre de la película que deseas buscar.\nEjemplo: `Avengers Endgame`',
-      { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown' }
-    );
-  }
-  else if (data === 'perfil') {
-    const usuario = await obtenerUsuario(userId);
-    if (!usuario || !(await usuarioActivo(userId))) {
-      bot.editMessageText('❌ No tienes una suscripción activa.', { chat_id: chatId, message_id: messageId });
-      return;
-    }
-    const expiracion = new Date(usuario.fecha_expiracion);
-    const diasRestantes = Math.ceil((expiracion - new Date()) / (1000 * 60 * 60 * 24));
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: '🎬 Buscar películas', callback_data: 'buscar' }],
-        [{ text: '🔄 Renovar', callback_data: 'renovar' }],
-        [{ text: '🔙 Volver', callback_data: 'volver_inicio' }]
-      ]
-    };
-    bot.editMessageText(
-      `👤 **Tu perfil**\n\n` +
-      `Plan: **${usuario.plan === 'clasico' ? 'Clásico⚜️' : 'Premium💎'}**\n` +
-      `📅 Expira: ${expiracion.toLocaleDateString()}\n` +
-      `⏳ Días restantes: ${diasRestantes}`,
-      { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: keyboard }
-    );
-  }
-  else if (data === 'renovar') {
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: '⚜️ Clásico', callback_data: 'plan_clasico' }],
-        [{ text: '💎 Premium', callback_data: 'plan_premium' }],
-        [{ text: '🔙 Volver', callback_data: 'volver_inicio' }]
-      ]
-    };
-    bot.editMessageText(
-      'Selecciona el plan para renovar tu suscripción:',
-      { chat_id: chatId, message_id: messageId, reply_markup: keyboard }
-    );
-  }
-  else if (data === 'volver_inicio') {
-    const usuario = await obtenerUsuario(userId);
-    const activo = await usuarioActivo(userId);
-    if (usuario && activo) {
-      const expiracion = new Date(usuario.fecha_expiracion);
-      const diasRestantes = Math.ceil((expiracion - new Date()) / (1000 * 60 * 60 * 24));
-      const inlineKeyboard = {
-        inline_keyboard: [
-          [{ text: '🎥 Buscar película', callback_data: 'buscar' }],
-          [{ text: '👤 Mi perfil', callback_data: 'perfil' }]
-        ]
-      };
-      if (esAdmin(userId)) {
-        inlineKeyboard.inline_keyboard.push([{ text: '⚙️ Panel Admin (Web)', url: `${WEBAPP_URL}?tg_id=${userId}` }]);
-      } else {
-        inlineKeyboard.inline_keyboard.push([{ text: '🌐 Abrir WebApp', url: `${WEBAPP_URL}?tg_id=${userId}` }]);
-      }
-      bot.editMessageText(
-        `✨ Bienvenido de nuevo.\nTu suscripción **${usuario.plan === 'clasico' ? 'Clásica⚜️' : 'Premium💎'}** está activa. Días restantes: ${diasRestantes}`,
-        { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: inlineKeyboard }
-      );
-    } else {
-      const inlineKeyboard = {
-        inline_keyboard: [
-          [{ text: '⚜️ Plan Clásico', callback_data: 'plan_clasico' }],
-          [{ text: '💎 Plan Premium', callback_data: 'plan_premium' }],
-          [{ text: '🌐 Abrir WebApp', url: `${WEBAPP_URL}?tg_id=${userId}` }]
-        ]
-      };
-      bot.editMessageText(
-        '🍿 **CineBot**\n\nSelecciona un plan para comenzar.',
-        { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: inlineKeyboard }
-      );
-    }
-  }
-  else if (data.startsWith('pelicula_')) {
-    const peliculaId = data.split('_')[1];
-    if (!(await usuarioActivo(userId))) {
-      bot.answerCallbackQuery(callbackQuery.id, { text: 'No tienes suscripción activa', show_alert: true });
-      return;
-    }
-    const { data: peli, error } = await supabase
-      .from('peliculas')
-      .select('*')
-      .eq('id', peliculaId)
-      .single();
-    if (error || !peli) {
-      bot.answerCallbackQuery(callbackQuery.id, { text: 'Película no encontrada', show_alert: true });
-      return;
-    }
-    const usuario = await obtenerUsuario(userId);
-    const protect = usuario.plan === 'clasico';
-    try {
-      await bot.forwardMessage(userId, CHANNEL_ID, peli.message_id, { protect_content: protect });
-      if (protect) {
-        bot.sendMessage(userId,
-          'ℹ️ Esta película tiene **protección de contenido**. No puedes reenviarla ni guardarla.\n' +
-          'Para disfrutar de estas funciones, actualiza al plan Premium.',
-          { parse_mode: 'Markdown' }
-        );
-      }
-      bot.answerCallbackQuery(callbackQuery.id, { text: 'Película enviada a tu chat' });
-    } catch (e) {
-      console.error('Error al reenviar:', e);
-      bot.answerCallbackQuery(callbackQuery.id, { text: 'Error al enviar', show_alert: true });
-    }
-  }
 });
 
-// Manejo de fotos (capturas de pago) - CORREGIDO
+// Manejo de fotos (capturas de pago)
 bot.on('photo', async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const plan = global.userPlans?.get(userId);
   if (!plan) {
-    bot.sendMessage(chatId, '⚠️ Primero debes elegir un plan con el botón "🎬 Planes".');
+    bot.sendMessage(chatId, '⚠️ Primero debes elegir un plan con "🎬 Ver planes".');
     return;
   }
 
@@ -416,7 +311,7 @@ bot.on('photo', async (msg) => {
 
     const fileName = `${userId}_${plan}_${uuidv4()}.jpg`;
     const { error: uploadError } = await supabaseAdmin.storage
-      .from('capturas') // Asegúrate que el bucket se llame "capturas" en Supabase
+      .from('capturas')
       .upload(fileName, buffer, { contentType: 'image/jpeg' });
     if (uploadError) throw uploadError;
 
@@ -438,17 +333,17 @@ bot.on('photo', async (msg) => {
       { parse_mode: 'Markdown' }
     );
 
+    // Notificar a admins (sin enlaces visibles, solo texto)
     for (const adminId of ADMIN_IDS) {
       try {
         bot.sendMessage(adminId,
-          `📩 Nueva solicitud de pago de ${msg.from.first_name} (@${msg.from.username})\n` +
-          `Plan: ${plan}\n` +
-          `ID: ${userId}\n` +
-          `Revisa en la webapp: ${WEBAPP_URL}?tg_id=${adminId}`
+          `📩 Nueva solicitud de pago\n` +
+          `👤 Usuario: ${msg.from.first_name} (@${msg.from.username})\n` +
+          `📋 Plan: ${plan}\n` +
+          `🆔 ID: ${userId}\n` +
+          `🌐 Revisa en la webapp (abre el menú y presiona "Panel Admin")`
         );
-      } catch (e) {
-        console.warn(`No se pudo notificar al admin ${adminId}:`, e);
-      }
+      } catch (e) {}
     }
 
     global.userPlans?.delete(userId);
@@ -486,16 +381,19 @@ bot.onText(/\/addpelicula (.+)/, async (msg, match) => {
 bot.onText(/\/panel/, async (msg) => {
   const userId = msg.from.id;
   if (!esAdmin(userId)) return;
+  const webAppButton = {
+    text: 'Abrir Panel Admin',
+    web_app: { url: `${WEBAPP_URL}?tg_id=${userId}` }
+  };
+  const keyboard = { inline_keyboard: [[webAppButton]] };
   bot.sendMessage(msg.chat.id,
-    `👨‍💼 **Panel de Administración**\n\n` +
-    `Accede a la webapp: ${WEBAPP_URL}?tg_id=${userId}`,
-    { parse_mode: 'Markdown' }
+    '👨‍💼 **Panel de Administración**\n\nHaz clic para abrir:',
+    { parse_mode: 'Markdown', reply_markup: keyboard }
   );
 });
 
-// ================= API ENDPOINTS =================
+// ================= API ENDPOINTS (para la webapp) =================
 
-// Obtener estado del usuario
 app.post('/api/user-status', async (req, res) => {
   const { telegram_id } = req.body;
   if (!telegram_id) return res.status(400).json({ error: 'Falta ID' });
@@ -510,7 +408,6 @@ app.post('/api/user-status', async (req, res) => {
   });
 });
 
-// Enviar solicitud de pago desde webapp
 app.post('/api/submit-payment', async (req, res) => {
   const { telegram_id, plan, metodo, imagen } = req.body;
   if (!telegram_id || !plan || !metodo || !imagen) {
@@ -542,7 +439,6 @@ app.post('/api/submit-payment', async (req, res) => {
   }
 });
 
-// Obtener solicitudes pendientes (solo admin)
 app.post('/api/pending-requests', async (req, res) => {
   const { telegram_id } = req.body;
   if (!telegram_id || !esAdmin(parseInt(telegram_id))) {
@@ -557,7 +453,6 @@ app.post('/api/pending-requests', async (req, res) => {
   res.json(data);
 });
 
-// Aprobar solicitud
 app.post('/api/approve-request', async (req, res) => {
   const { admin_id, solicitud_id } = req.body;
   if (!admin_id || !esAdmin(parseInt(admin_id))) {
@@ -592,13 +487,11 @@ app.post('/api/approve-request', async (req, res) => {
       `✅ **¡Pago aprobado!**\n\nTu suscripción **${sol.plan_solicitado}** está activa hasta el ${fechaExpiracion.toLocaleDateString()}.\n¡Disfruta del catálogo! 🍿`,
       { parse_mode: 'Markdown' }
     );
-  } catch (e) {
-    console.warn(`No se pudo notificar al usuario ${sol.telegram_id}:`, e);
-  }
+  } catch (e) {}
+
   res.json({ success: true });
 });
 
-// Rechazar solicitud
 app.post('/api/reject-request', async (req, res) => {
   const { admin_id, solicitud_id, motivo } = req.body;
   if (!admin_id || !esAdmin(parseInt(admin_id))) {
@@ -621,14 +514,11 @@ app.post('/api/reject-request', async (req, res) => {
         `❌ **Pago rechazado**\n\nMotivo: ${motivo}\n\nPuedes intentar nuevamente con otro comprobante.`,
         { parse_mode: 'Markdown' }
       );
-    } catch (e) {
-      console.warn(`No se pudo notificar al usuario ${sol.telegram_id}:`, e);
-    }
+    } catch (e) {}
   }
   res.json({ success: true });
 });
 
-// Obtener catálogo de películas (requiere suscripción activa)
 app.post('/api/catalogo', async (req, res) => {
   const { telegram_id, page = 1, search = '' } = req.body;
   if (!telegram_id || !(await usuarioActivo(parseInt(telegram_id)))) {
@@ -649,7 +539,6 @@ app.post('/api/catalogo', async (req, res) => {
   res.json({ data, total: count, page });
 });
 
-// Solicitar envío de película al chat de Telegram
 app.post('/api/request-movie', async (req, res) => {
   const { telegram_id, pelicula_id } = req.body;
   if (!telegram_id || !(await usuarioActivo(parseInt(telegram_id)))) {
@@ -673,12 +562,7 @@ app.post('/api/request-movie', async (req, res) => {
   }
 });
 
-// Ruta para la webapp (debe ir al final)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'webapp', 'index.html'));
-});
-
-// ================= INICIAR SERVIDOR Y WEBHOOK =================
+// ================= INICIAR SERVIDOR =================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
