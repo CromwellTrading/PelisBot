@@ -392,8 +392,9 @@ bot.onText(/\/panel/, async (msg) => {
   );
 });
 
-// ================= API ENDPOINTS (para la webapp) =================
+// ================= API ENDPOINTS =================
 
+// Obtener estado del usuario
 app.post('/api/user-status', async (req, res) => {
   const { telegram_id } = req.body;
   if (!telegram_id) return res.status(400).json({ error: 'Falta ID' });
@@ -408,6 +409,7 @@ app.post('/api/user-status', async (req, res) => {
   });
 });
 
+// Enviar solicitud de pago desde webapp
 app.post('/api/submit-payment', async (req, res) => {
   const { telegram_id, plan, metodo, imagen } = req.body;
   if (!telegram_id || !plan || !metodo || !imagen) {
@@ -439,6 +441,7 @@ app.post('/api/submit-payment', async (req, res) => {
   }
 });
 
+// Obtener solicitudes pendientes (solo admin)
 app.post('/api/pending-requests', async (req, res) => {
   const { telegram_id } = req.body;
   if (!telegram_id || !esAdmin(parseInt(telegram_id))) {
@@ -453,6 +456,7 @@ app.post('/api/pending-requests', async (req, res) => {
   res.json(data);
 });
 
+// Aprobar solicitud
 app.post('/api/approve-request', async (req, res) => {
   const { admin_id, solicitud_id } = req.body;
   if (!admin_id || !esAdmin(parseInt(admin_id))) {
@@ -492,6 +496,7 @@ app.post('/api/approve-request', async (req, res) => {
   res.json({ success: true });
 });
 
+// Rechazar solicitud
 app.post('/api/reject-request', async (req, res) => {
   const { admin_id, solicitud_id, motivo } = req.body;
   if (!admin_id || !esAdmin(parseInt(admin_id))) {
@@ -519,6 +524,7 @@ app.post('/api/reject-request', async (req, res) => {
   res.json({ success: true });
 });
 
+// Obtener catálogo de películas (requiere suscripción activa)
 app.post('/api/catalogo', async (req, res) => {
   const { telegram_id, page = 1, search = '' } = req.body;
   if (!telegram_id || !(await usuarioActivo(parseInt(telegram_id)))) {
@@ -539,6 +545,7 @@ app.post('/api/catalogo', async (req, res) => {
   res.json({ data, total: count, page });
 });
 
+// Solicitar envío de película al chat de Telegram
 app.post('/api/request-movie', async (req, res) => {
   const { telegram_id, pelicula_id } = req.body;
   if (!telegram_id || !(await usuarioActivo(parseInt(telegram_id)))) {
@@ -562,7 +569,71 @@ app.post('/api/request-movie', async (req, res) => {
   }
 });
 
-// ================= INICIAR SERVIDOR =================
+// ================= NUEVOS ENDPOINTS PARA ADMIN =================
+
+// Obtener lista de todos los usuarios (solo admin)
+app.post('/api/users', async (req, res) => {
+  const { admin_id } = req.body;
+  if (!admin_id || !esAdmin(parseInt(admin_id))) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  const { data, error } = await supabaseAdmin
+    .from('usuarios')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// Obtener catálogo completo (sin verificar suscripción) - solo admin
+app.post('/api/catalogo-admin', async (req, res) => {
+  const { admin_id, page = 1, search = '' } = req.body;
+  if (!admin_id || !esAdmin(parseInt(admin_id))) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  const limit = 10;
+  const offset = (page - 1) * limit;
+  let query = supabaseAdmin
+    .from('peliculas')
+    .select('*', { count: 'exact' })
+    .range(offset, offset + limit - 1)
+    .order('titulo');
+  if (search) {
+    query = query.ilike('titulo', `%${search}%`);
+  }
+  const { data, error, count } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ data, total: count, page });
+});
+
+// Agregar nueva película (solo admin)
+app.post('/api/add-movie', async (req, res) => {
+  const { admin_id, titulo, message_id } = req.body;
+  if (!admin_id || !esAdmin(parseInt(admin_id))) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  if (!titulo || !message_id) {
+    return res.status(400).json({ error: 'Faltan datos' });
+  }
+  try {
+    await supabaseAdmin.from('peliculas').insert({
+      titulo,
+      message_id: parseInt(message_id),
+      canal_id: CHANNEL_ID
+    });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Error agregando película:', e);
+    res.status(500).json({ error: 'Error al agregar' });
+  }
+});
+
+// ================= RUTA PARA LA WEBAPP =================
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'webapp', 'index.html'));
+});
+
+// ================= INICIAR SERVIDOR Y WEBHOOK =================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
