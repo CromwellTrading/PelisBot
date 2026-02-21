@@ -14,7 +14,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const WEBAPP_URL = process.env.WEBAPP_URL || 'https://localhost';
-const WEBHOOK_URL = process.env.WEBHOOK_URL;
+const WEBHOOK_URL = process.env.WEBHOOK_URL; // Opcional, si no se provee se construye
 
 // Clientes Supabase
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -53,7 +53,7 @@ async function usuarioActivo(telegramId) {
   return expiracion > new Date();
 }
 
-// Caché simple en memoria
+// Caché simple en memoria (opcional, se puede mejorar)
 const busquedaCache = new Map();
 function buscarPeliculasCached(query, limit = 10) {
   const key = query.toLowerCase();
@@ -63,20 +63,23 @@ function buscarPeliculasCached(query, limit = 10) {
       return cached.data;
     }
   }
-  // No en caché, buscar en BD (se hará en el endpoint)
   return null;
 }
 
 // ================= CONFIGURACIÓN DEL BOT =================
 const bot = new TelegramBot(BOT_TOKEN);
-// Configurar webhook
-bot.setWebHook(WEBHOOK_URL);
 
 // ================= EXPRESS APP =================
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'webapp')));
+
+// Endpoint para el webhook de Telegram
+app.post('/webhook', (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
 
 // ================= HANDLERS DEL BOT =================
 bot.onText(/\/start/, async (msg) => {
@@ -138,8 +141,6 @@ bot.on('callback_query', async (callbackQuery) => {
 
   if (data.startsWith('plan_')) {
     const plan = data.split('_')[1];
-    // Guardar plan en memoria (podríamos usar userData, pero es más simple con una variable global temporal)
-    // En node-telegram-bot-api no hay userData persistente fácil, usaremos una colección en memoria.
     if (!global.userPlans) global.userPlans = new Map();
     global.userPlans.set(userId, plan);
 
@@ -298,12 +299,12 @@ bot.on('callback_query', async (callbackQuery) => {
     }
   }
   else if (data.startsWith('pagina_')) {
-    // Manejo de paginación (pendiente de implementar)
+    // Manejo de paginación (pendiente de implementar completo)
     // Se puede implementar con un estado en memoria
+    bot.answerCallbackQuery(callbackQuery.id, { text: 'Función en desarrollo' });
   }
   else if (data.startsWith('pelicula_')) {
     const peliculaId = data.split('_')[1];
-    // Enviar película
     if (!(await usuarioActivo(userId))) {
       bot.answerCallbackQuery(callbackQuery.id, { text: 'No tienes suscripción activa', show_alert: true });
       return;
@@ -346,16 +347,13 @@ bot.on('photo', async (msg) => {
     return;
   }
 
-  // Obtener la foto de mayor resolución
   const photo = msg.photo[msg.photo.length - 1];
   const fileId = photo.file_id;
   const fileLink = await bot.getFileLink(fileId);
-  // Descargar la imagen
   const response = await fetch(fileLink);
   const buffer = await response.buffer();
 
   const fileName = `${userId}_${plan}_${uuidv4()}.jpg`;
-  // Subir a Supabase Storage usando service role
   const { error: uploadError } = await supabaseAdmin.storage
     .from('capturas')
     .upload(fileName, buffer, { contentType: 'image/jpeg' });
@@ -367,7 +365,6 @@ bot.on('photo', async (msg) => {
   const { data: urlData } = supabaseAdmin.storage.from('capturas').getPublicUrl(fileName);
   const publicUrl = urlData.publicUrl;
 
-  // Guardar solicitud
   await supabaseAdmin.from('solicitudes_pago').insert({
     telegram_id: userId,
     plan_solicitado: plan,
@@ -388,7 +385,6 @@ bot.on('photo', async (msg) => {
     { parse_mode: 'Markdown', reply_markup: keyboard }
   );
 
-  // Notificar a admins
   for (const adminId of ADMIN_IDS) {
     try {
       bot.sendMessage(adminId,
@@ -402,11 +398,10 @@ bot.on('photo', async (msg) => {
     }
   }
 
-  // Limpiar plan temporal
   global.userPlans?.delete(userId);
 });
 
-// Comandos de admin (solo responden si es admin)
+// Comandos de admin
 bot.onText(/\/addpelicula (.+)/, async (msg, match) => {
   const userId = msg.from.id;
   if (!esAdmin(userId)) return;
@@ -612,13 +607,22 @@ app.post('/api/request-movie', async (req, res) => {
   }
 });
 
-// Ruta para la webapp
+// Ruta para la webapp (debe ir al final)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'webapp', 'index.html'));
 });
 
-// ================= INICIAR SERVIDOR =================
+// ================= INICIAR SERVIDOR Y CONFIGURAR WEBHOOK =================
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
+  
+  // Configurar webhook
+  const webhookUrl = process.env.WEBHOOK_URL || `${WEBAPP_URL}/webhook`;
+  try {
+    await bot.setWebHook(webhookUrl);
+    console.log(`✅ Webhook configurado en ${webhookUrl}`);
+  } catch (error) {
+    console.error('❌ Error configurando webhook:', error);
+  }
 });
