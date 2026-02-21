@@ -3,9 +3,9 @@ import logging
 import uuid
 import threading
 import time
+import base64
 from datetime import datetime, timedelta
 from functools import lru_cache
-from pathlib import Path
 
 from flask import Flask, request, jsonify, session, send_from_directory
 from flask_cors import CORS
@@ -33,8 +33,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://localhost")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")  # Cambiar en producción
-SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-secret-change-me")
+SESSION_SECRET = os.getenv("SESSION_SECRET", os.urandom(24).hex())
 
 # Configurar logging
 logging.basicConfig(
@@ -73,7 +72,10 @@ def obtener_usuario(telegram_id: int):
 
 def usuario_activo(telegram_id: int) -> bool:
     user = obtener_usuario(telegram_id)
-    return user is not None and user.get("activo", False)
+    if not user or not user.get("fecha_expiracion"):
+        return False
+    expiracion = datetime.fromisoformat(user["fecha_expiracion"])
+    return expiracion > datetime.now()
 
 @lru_cache(maxsize=128)
 def buscar_peliculas_cached(query: str, limit: int = 10):
@@ -86,8 +88,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     usuario = obtener_usuario(user.id)
 
-    if usuario and usuario.get("activo"):
-        # Mostrar menú principal con botones
+    if usuario and usuario_activo(user.id):
         expiracion = datetime.fromisoformat(usuario["fecha_expiracion"])
         dias_restantes = (expiracion - datetime.now()).days
         keyboard = [
@@ -95,6 +96,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("👤 Mi perfil", callback_data="perfil")],
             [InlineKeyboardButton("❓ Ayuda", callback_data="ayuda")]
         ]
+        if es_admin(user.id):
+            # Los admins ven enlace directo a la webapp con su ID
+            webapp_link = f"{WEBAPP_URL}?tg_id={user.id}"
+            keyboard.append([InlineKeyboardButton("⚙️ Panel Admin (Web)", url=webapp_link)])
+        else:
+            # Usuarios normales también pueden ir a la webapp con su ID
+            webapp_link = f"{WEBAPP_URL}?tg_id={user.id}"
+            keyboard.append([InlineKeyboardButton("🌐 Abrir WebApp", url=webapp_link)])
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
             f"✨ ¡Bienvenido de nuevo, {user.first_name}! ✨\n\n"
@@ -108,7 +117,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("🎬 Plan Clásico", callback_data="plan_clasico")],
             [InlineKeyboardButton("🌟 Plan Premium", callback_data="plan_premium")],
-            [InlineKeyboardButton("❓ Ayuda", callback_data="ayuda")]
+            [InlineKeyboardButton("🌐 Abrir WebApp", url=f"{WEBAPP_URL}?tg_id={user.id}")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
@@ -117,7 +126,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "**Precios:**\n"
             "• Tarjeta/Monedero: Clásico 200 CUP | Premium 350 CUP\n"
             "• Saldo Móvil: Clásico 120 CUP | Premium 200 CUP\n\n"
-            "Elige un plan:",
+            "Puedes pagar desde el bot o desde la webapp.",
             reply_markup=reply_markup,
             parse_mode=ParseMode.MARKDOWN
         )
@@ -153,12 +162,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Ejemplo: `Avengers Endgame`",
             parse_mode=ParseMode.MARKDOWN
         )
-        # El siguiente mensaje del usuario será manejado por buscar_pelicula
 
     elif data == "perfil":
         user_id = query.from_user.id
         usuario = obtener_usuario(user_id)
-        if not usuario or not usuario.get("activo"):
+        if not usuario or not usuario_activo(user_id):
             await query.edit_message_text("❌ No tienes una suscripción activa.")
             return
         expiracion = datetime.fromisoformat(usuario["fecha_expiracion"])
@@ -205,10 +213,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif data == "volver_inicio":
-        # Volver al menú principal
         user_id = query.from_user.id
         usuario = obtener_usuario(user_id)
-        if usuario and usuario.get("activo"):
+        if usuario and usuario_activo(user_id):
             expiracion = datetime.fromisoformat(usuario["fecha_expiracion"])
             dias_restantes = (expiracion - datetime.now()).days
             keyboard = [
@@ -216,6 +223,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("👤 Mi perfil", callback_data="perfil")],
                 [InlineKeyboardButton("❓ Ayuda", callback_data="ayuda")]
             ]
+            if es_admin(user_id):
+                webapp_link = f"{WEBAPP_URL}?tg_id={user_id}"
+                keyboard.append([InlineKeyboardButton("⚙️ Panel Admin (Web)", url=webapp_link)])
+            else:
+                webapp_link = f"{WEBAPP_URL}?tg_id={user_id}"
+                keyboard.append([InlineKeyboardButton("🌐 Abrir WebApp", url=webapp_link)])
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
                 f"✨ ¡Bienvenido de nuevo! ✨\n\n"
@@ -229,7 +242,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = [
                 [InlineKeyboardButton("🎬 Plan Clásico", callback_data="plan_clasico")],
                 [InlineKeyboardButton("🌟 Plan Premium", callback_data="plan_premium")],
-                [InlineKeyboardButton("❓ Ayuda", callback_data="ayuda")]
+                [InlineKeyboardButton("🌐 Abrir WebApp", url=f"{WEBAPP_URL}?tg_id={user_id}")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
@@ -246,12 +259,10 @@ async def handle_captura(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Primero debes elegir un plan con /start")
         return
 
-    # Descargar foto
     photo_file = await update.message.photo[-1].get_file()
     file_name = f"{user.id}_{plan}_{uuid.uuid4()}.jpg"
     photo_bytes = await photo_file.download_as_bytearray()
 
-    # Subir a Supabase Storage con service role
     try:
         supabase_admin.storage.from_("capturas").upload(file_name, photo_bytes, {"content-type": "image/jpeg"})
     except Exception as e:
@@ -261,7 +272,6 @@ async def handle_captura(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     public_url = supabase_admin.storage.from_("capturas").get_public_url(file_name)
 
-    # Guardar solicitud
     supabase_admin.table("solicitudes_pago").insert({
         "telegram_id": user.id,
         "plan_solicitado": plan,
@@ -280,7 +290,6 @@ async def handle_captura(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN
     )
 
-    # Notificar a admins
     for admin_id in ADMIN_IDS:
         try:
             await context.bot.send_message(
@@ -288,7 +297,7 @@ async def handle_captura(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📩 Nueva solicitud de pago de {user.first_name} (@{user.username})\n"
                 f"Plan: {plan}\n"
                 f"ID: {user.id}\n"
-                f"Revisa en la webapp: {WEBAPP_URL}"
+                f"Revisa en la webapp: {WEBAPP_URL}?tg_id={admin_id}"
             )
         except Exception as e:
             logger.warning(f"No se pudo notificar al admin {admin_id}: {e}")
@@ -304,8 +313,7 @@ async def buscar_pelicula(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔍 Escribe al menos 3 caracteres para buscar.")
         return
 
-    # Usar caché
-    resultados = buscar_peliculas_cached(query, limit=20)  # Traemos más para paginar
+    resultados = buscar_peliculas_cached(query, limit=20)
 
     if not resultados:
         keyboard = [[InlineKeyboardButton("🔙 Volver al inicio", callback_data="volver_inicio")]]
@@ -316,7 +324,6 @@ async def buscar_pelicula(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Paginación: guardar resultados en context.user_data
     context.user_data["ultima_busqueda"] = {
         "query": query,
         "resultados": resultados,
@@ -325,13 +332,12 @@ async def buscar_pelicula(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await mostrar_pagina(update, context, 0)
 
 async def mostrar_pagina(update: Update, context: ContextTypes.DEFAULT_TYPE, pagina: int, edit: bool = False):
-    """Muestra una página de resultados de búsqueda."""
     busqueda = context.user_data.get("ultima_busqueda")
     if not busqueda:
         return
 
     resultados = busqueda["resultados"]
-    total_paginas = (len(resultados) + 9) // 10  # 10 por página
+    total_paginas = (len(resultados) + 9) // 10
     inicio = pagina * 10
     fin = inicio + 10
     pagina_actual = resultados[inicio:fin]
@@ -340,7 +346,6 @@ async def mostrar_pagina(update: Update, context: ContextTypes.DEFAULT_TYPE, pag
     for peli in pagina_actual:
         keyboard.append([InlineKeyboardButton(peli["titulo"], callback_data=f"pelicula_{peli['id']}")])
 
-    # Botones de navegación
     nav_buttons = []
     if pagina > 0:
         nav_buttons.append(InlineKeyboardButton("⬅️ Anterior", callback_data=f"pagina_{pagina-1}"))
@@ -349,7 +354,6 @@ async def mostrar_pagina(update: Update, context: ContextTypes.DEFAULT_TYPE, pag
     if nav_buttons:
         keyboard.append(nav_buttons)
 
-    # Botón volver al inicio
     keyboard.append([InlineKeyboardButton("🔙 Volver al inicio", callback_data="volver_inicio")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -378,7 +382,6 @@ async def enviar_pelicula(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("⚠️ Tu suscripción no está activa.")
         return
 
-    # Obtener película
     peli = supabase_client.table("peliculas").select("*").eq("id", pelicula_id).execute().data
     if not peli:
         await query.edit_message_text("❌ Película no encontrada.")
@@ -409,8 +412,7 @@ async def enviar_pelicula(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================= COMANDOS DE ADMIN =================
 async def add_pelicula(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not es_admin(update.effective_user.id):
-        await update.message.reply_text("⛔ No autorizado.")
-        return
+        return  # Silencio total para no admins
 
     if not update.message.reply_to_message:
         await update.message.reply_text("❌ Debes responder al mensaje de la película en el canal con /addpelicula Título")
@@ -430,34 +432,29 @@ async def add_pelicula(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Error en el comando. Usa: /addpelicula Título")
         return
 
-    # Guardar en BD
     supabase_admin.table("peliculas").insert({
         "titulo": titulo,
         "message_id": replied.message_id,
         "canal_id": CHANNEL_ID
     }).execute()
 
-    # Limpiar caché de búsqueda
     buscar_peliculas_cached.cache_clear()
     await update.message.reply_text(f"✅ Película '{titulo}' agregada correctamente.")
 
 async def panel_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not es_admin(update.effective_user.id):
-        await update.message.reply_text("⛔ No autorizado.")
         return
     await update.message.reply_text(
         f"👨‍💼 **Panel de Administración**\n\n"
-        f"Accede a la webapp: {WEBAPP_URL}",
+        f"Accede a la webapp: {WEBAPP_URL}?tg_id={update.effective_user.id}",
         parse_mode=ParseMode.MARKDOWN
     )
 
 # ================= TAREA PROGRAMADA: NOTIFICACIONES DE EXPIRACIÓN =================
 def verificar_expiraciones(app_bot):
-    """Ejecuta en un hilo separado, revisa cada 6 horas."""
     while True:
         try:
             ahora = datetime.now()
-            # Usuarios que expiran en 5, 3, 1 día
             for dias in [5, 3, 1]:
                 fecha_limite = ahora + timedelta(days=dias)
                 inicio_dia = datetime(fecha_limite.year, fecha_limite.month, fecha_limite.day, 0, 0, 0)
@@ -474,12 +471,12 @@ def verificar_expiraciones(app_bot):
                         logger.warning(f"Error al notificar expiración a {user['telegram_id']}: {e}")
         except Exception as e:
             logger.error(f"Error en verificar_expiraciones: {e}")
-        time.sleep(6 * 3600)  # cada 6 horas
+        time.sleep(6 * 3600)
 
-# ================= SERVIDOR FLASK (WEBAPP Y API) =================
+# ================= SERVIDOR FLASK =================
 flask_app = Flask(__name__, static_folder='webapp', static_url_path='')
 flask_app.secret_key = SESSION_SECRET
-CORS(flask_app, supports_credentials=True)  # Permitir cookies
+CORS(flask_app, supports_credentials=True)
 
 @flask_app.route('/')
 def serve_webapp():
@@ -491,50 +488,118 @@ def webhook():
     application.process_update(update)
     return 'ok', 200
 
-@flask_app.route('/notify', methods=['POST'])
-def notify():
-    """Endpoint para que la webapp notifique al usuario (aprobación/rechazo)."""
-    if not session.get('admin'):
-        return 'No autorizado', 401
+# ========== API PARA LA WEBAPP ==========
+@flask_app.route('/api/user-status', methods=['POST'])
+def user_status():
     data = request.json
-    telegram_id = data.get('telegram_id')
-    mensaje = data.get('mensaje')
-    if not telegram_id or not mensaje:
-        return 'Faltan datos', 400
+    tid = data.get('telegram_id')
+    if not tid:
+        return jsonify({'error': 'Falta ID'}), 400
+    usuario = obtener_usuario(int(tid))
+    activo = usuario_activo(int(tid)) if usuario else False
+    return jsonify({
+        'existe': usuario is not None,
+        'activo': activo,
+        'plan': usuario['plan'] if usuario else None,
+        'expiracion': usuario['fecha_expiracion'] if usuario else None,
+        'es_admin': es_admin(int(tid))
+    })
+
+@flask_app.route('/api/submit-payment', methods=['POST'])
+def submit_payment():
+    data = request.json
+    tid = data.get('telegram_id')
+    plan = data.get('plan')
+    metodo = data.get('metodo')
+    imagen_base64 = data.get('imagen')
+    if not all([tid, plan, metodo, imagen_base64]):
+        return jsonify({'error': 'Faltan datos'}), 400
     try:
-        application.bot.send_message(chat_id=telegram_id, text=mensaje, parse_mode=ParseMode.MARKDOWN)
-        return 'ok', 200
+        header, encoded = imagen_base64.split(',', 1)
+        img_data = base64.b64decode(encoded)
+        file_name = f"{tid}_{plan}_{uuid.uuid4()}.jpg"
+        supabase_admin.storage.from_("capturas").upload(file_name, img_data, {"content-type": "image/jpeg"})
+        public_url = supabase_admin.storage.from_("capturas").get_public_url(file_name)
     except Exception as e:
-        logger.error(f"Error al notificar: {e}")
-        return 'error', 500
+        logger.error(f"Error subiendo captura: {e}")
+        return jsonify({'error': 'Error al procesar imagen'}), 500
 
-@flask_app.route('/login', methods=['POST'])
-def login():
-    """Autenticación para la webapp."""
-    data = request.json
-    password = data.get('password')
-    if password == ADMIN_PASSWORD:
-        session['admin'] = True
-        return jsonify({'success': True})
-    return jsonify({'success': False}), 401
-
-@flask_app.route('/logout', methods=['POST'])
-def logout():
-    session.pop('admin', None)
+    supabase_admin.table("solicitudes_pago").insert({
+        "telegram_id": int(tid),
+        "plan_solicitado": plan,
+        "metodo_pago": metodo,
+        "captura_url": public_url,
+        "estado": "pendiente"
+    }).execute()
     return jsonify({'success': True})
 
-@flask_app.route('/check-auth', methods=['GET'])
-def check_auth():
-    return jsonify({'authenticated': session.get('admin', False)})
-
-# API para catálogo (protegida)
-@flask_app.route('/api/movies', methods=['GET'])
-def get_movies():
-    if not session.get('admin'):
+@flask_app.route('/api/pending-requests', methods=['POST'])
+def pending_requests():
+    data = request.json
+    tid = data.get('telegram_id')
+    if not tid or not es_admin(int(tid)):
         return jsonify({'error': 'No autorizado'}), 401
-    page = int(request.args.get('page', 1))
-    limit = int(request.args.get('limit', 10))
-    search = request.args.get('search', '')
+    resp = supabase_admin.table("solicitudes_pago").select("*").eq("estado", "pendiente").order("created_at", desc=True).execute()
+    return jsonify(resp.data)
+
+@flask_app.route('/api/approve-request', methods=['POST'])
+def approve_request():
+    data = request.json
+    admin_id = data.get('admin_id')
+    solicitud_id = data.get('solicitud_id')
+    if not admin_id or not es_admin(int(admin_id)):
+        return jsonify({'error': 'No autorizado'}), 401
+    sol = supabase_admin.table("solicitudes_pago").select("*").eq("id", solicitud_id).execute()
+    if not sol.data:
+        return jsonify({'error': 'No existe'}), 404
+    sol = sol.data[0]
+    supabase_admin.table("solicitudes_pago").update({"estado": "aprobado"}).eq("id", solicitud_id).execute()
+    fecha_expiracion = datetime.now() + timedelta(days=30)
+    supabase_admin.table("usuarios").upsert({
+        "telegram_id": sol["telegram_id"],
+        "plan": sol["plan_solicitado"],
+        "fecha_inicio": datetime.now().isoformat(),
+        "fecha_expiracion": fecha_expiracion.isoformat()
+    }, on_conflict="telegram_id").execute()
+    try:
+        application.bot.send_message(
+            chat_id=sol["telegram_id"],
+            text=f"✅ **¡Pago aprobado!**\n\nTu suscripción **{sol['plan_solicitado']}** está activa hasta el {fecha_expiracion.strftime('%d/%m/%Y')}.\n¡Disfruta del catálogo! 🍿",
+            parse_mode=ParseMode.MARKDOWN
+        )
+    except Exception as e:
+        logger.warning(f"No se pudo notificar al usuario {sol['telegram_id']}: {e}")
+    return jsonify({'success': True})
+
+@flask_app.route('/api/reject-request', methods=['POST'])
+def reject_request():
+    data = request.json
+    admin_id = data.get('admin_id')
+    solicitud_id = data.get('solicitud_id')
+    motivo = data.get('motivo', '')
+    if not admin_id or not es_admin(int(admin_id)):
+        return jsonify({'error': 'No autorizado'}), 401
+    supabase_admin.table("solicitudes_pago").update({"estado": "rechazado", "motivo_rechazo": motivo}).eq("id", solicitud_id).execute()
+    sol = supabase_admin.table("solicitudes_pago").select("*").eq("id", solicitud_id).execute().data[0]
+    try:
+        application.bot.send_message(
+            chat_id=sol["telegram_id"],
+            text=f"❌ **Pago rechazado**\n\nMotivo: {motivo}\n\nPuedes intentar nuevamente con otro comprobante.",
+            parse_mode=ParseMode.MARKDOWN
+        )
+    except Exception as e:
+        logger.warning(f"No se pudo notificar al usuario {sol['telegram_id']}: {e}")
+    return jsonify({'success': True})
+
+@flask_app.route('/api/catalogo', methods=['POST'])
+def catalogo():
+    data = request.json
+    tid = data.get('telegram_id')
+    if not tid or not usuario_activo(int(tid)):
+        return jsonify({'error': 'Suscripción no activa'}), 403
+    page = int(data.get('page', 1))
+    search = data.get('search', '')
+    limit = 10
     offset = (page - 1) * limit
     query = supabase_admin.table("peliculas").select("*", count="exact")
     if search:
@@ -544,61 +609,49 @@ def get_movies():
     return jsonify({
         'data': resp.data,
         'total': resp.count,
-        'page': page,
-        'limit': limit
+        'page': page
     })
 
-@flask_app.route('/api/movies', methods=['POST'])
-def add_movie():
-    if not session.get('admin'):
-        return jsonify({'error': 'No autorizado'}), 401
+@flask_app.route('/api/request-movie', methods=['POST'])
+def request_movie():
     data = request.json
-    titulo = data.get('titulo')
-    message_id = data.get('message_id')
-    if not titulo or not message_id:
-        return jsonify({'error': 'Faltan datos'}), 400
-    # Verificar que el message_id sea válido (opcional)
+    tid = data.get('telegram_id')
+    pelicula_id = data.get('pelicula_id')
+    if not tid or not usuario_activo(int(tid)):
+        return jsonify({'error': 'Suscripción no activa'}), 403
+    peli = supabase_admin.table("peliculas").select("*").eq("id", pelicula_id).execute()
+    if not peli.data:
+        return jsonify({'error': 'Película no encontrada'}), 404
+    peli = peli.data[0]
+    usuario = obtener_usuario(int(tid))
+    protect = (usuario["plan"] == "clasico")
     try:
-        supabase_admin.table("peliculas").insert({
-            "titulo": titulo,
-            "message_id": int(message_id),
-            "canal_id": CHANNEL_ID
-        }).execute()
-        buscar_peliculas_cached.cache_clear()
+        application.bot.forward_message(
+            chat_id=int(tid),
+            from_chat_id=CHANNEL_ID,
+            message_id=peli["message_id"],
+            protect_content=protect
+        )
         return jsonify({'success': True})
     except Exception as e:
-        logger.error(f"Error al agregar película: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@flask_app.route('/api/users', methods=['GET'])
-def get_users():
-    if not session.get('admin'):
-        return jsonify({'error': 'No autorizado'}), 401
-    page = int(request.args.get('page', 1))
-    limit = int(request.args.get('limit', 10))
-    offset = (page - 1) * limit
-    resp = supabase_admin.table("usuarios").select("*", count="exact").range(offset, offset + limit - 1).order("created_at", desc=True).execute()
-    return jsonify({
-        'data': resp.data,
-        'total': resp.count,
-        'page': page,
-        'limit': limit
-    })
+        logger.error(f"Error enviando película: {e}")
+        return jsonify({'error': 'Error al enviar'}), 500
 
 # ================= MAIN =================
 if __name__ == "__main__":
-    # Crear aplicación del bot
     application = Application.builder().token(BOT_TOKEN).build()
 
     # Handlers
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_handler))  # Manejador general de botones
+    application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.PHOTO, handle_captura))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, buscar_pelicula))
+    application.add_handler(CallbackQueryHandler(paginacion_callback, pattern="^pagina_"))
+    application.add_handler(CallbackQueryHandler(enviar_pelicula, pattern="^pelicula_"))
     application.add_handler(CommandHandler("addpelicula", add_pelicula))
     application.add_handler(CommandHandler("panel", panel_admin))
 
-    # Iniciar hilo de expiraciones
+    # Hilo de expiraciones
     threading.Thread(target=verificar_expiraciones, args=(application,), daemon=True).start()
 
     # Configurar webhook
