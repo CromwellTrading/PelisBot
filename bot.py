@@ -97,11 +97,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("❓ Ayuda", callback_data="ayuda")]
         ]
         if es_admin(user.id):
-            # Los admins ven enlace directo a la webapp con su ID
             webapp_link = f"{WEBAPP_URL}?tg_id={user.id}"
             keyboard.append([InlineKeyboardButton("⚙️ Panel Admin (Web)", url=webapp_link)])
         else:
-            # Usuarios normales también pueden ir a la webapp con su ID
             webapp_link = f"{WEBAPP_URL}?tg_id={user.id}"
             keyboard.append([InlineKeyboardButton("🌐 Abrir WebApp", url=webapp_link)])
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -637,8 +635,25 @@ def request_movie():
         logger.error(f"Error enviando película: {e}")
         return jsonify({'error': 'Error al enviar'}), 500
 
+# ================= CONFIGURACIÓN DEL WEBHOOK =================
+async def set_webhook():
+    """Configura el webhook al iniciar la aplicación."""
+    # Intentar obtener la URL de la variable de entorno
+    webhook_url = os.getenv("WEBHOOK_URL")
+    if not webhook_url:
+        # Fallback: usar RENDER_EXTERNAL_HOSTNAME si existe
+        host = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
+        if host:
+            webhook_url = f"https://{host}/webhook"
+        else:
+            logger.error("No se pudo determinar la URL del webhook. Define WEBHOOK_URL en las variables de entorno.")
+            return
+    await application.bot.set_webhook(webhook_url)
+    logger.info(f"Webhook configurado en {webhook_url}")
+
 # ================= MAIN =================
 if __name__ == "__main__":
+    # Crear aplicación del bot
     application = Application.builder().token(BOT_TOKEN).build()
 
     # Handlers
@@ -657,14 +672,9 @@ if __name__ == "__main__":
     # Configurar webhook
     port = int(os.environ.get('PORT', 8080))
     import asyncio
-    async def set_webhook():
-        url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/webhook"
-        await application.bot.set_webhook(url)
-        logger.info(f"Webhook configurado en {url}")
-
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(set_webhook())
 
-    # Iniciar Flask
+    # Iniciar Flask con Gunicorn o directamente
     flask_app.run(host='0.0.0.0', port=port, debug=False)
