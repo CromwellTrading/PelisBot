@@ -66,9 +66,9 @@ app.post('/webhook', (req, res) => {
   res.sendStatus(200);
 });
 
-// Estado para búsqueda y sugerencias
-const searchState = new Map(); // userId -> true
-const suggestState = new Map(); // userId -> true
+// Estados para búsqueda y sugerencias
+const searchState = new Map();
+const suggestState = new Map();
 
 // ================= FUNCIÓN PARA TECLADO PRINCIPAL =================
 function getMainKeyboard(userId, tieneSuscripcion) {
@@ -548,13 +548,12 @@ app.post('/api/submit-payment', async (req, res) => {
     const { data: urlData } = supabaseAdmin.storage.from('capturas').getPublicUrl(fileName);
     const publicUrl = urlData.publicUrl;
 
-    // Guardar con el método especificado (tarjeta o saldo)
     const { data: insertData, error: insertError } = await supabaseAdmin
       .from('solicitudes_pago')
       .insert({
         telegram_id: parseInt(telegram_id),
         plan_solicitado: plan,
-        metodo_pago: metodo, // 'tarjeta' o 'saldo'
+        metodo_pago: metodo,
         captura_url: publicUrl,
         estado: 'pendiente'
       })
@@ -614,12 +613,10 @@ app.post('/api/approve-request', async (req, res) => {
       fecha_expiracion: fechaExpiracion.toISOString()
     }, { onConflict: 'telegram_id' });
 
-  // Actualizar estadísticas de comisiones (solo si es aprobado)
-  // Buscar el mes actual (primer día del mes)
+  // Actualizar estadísticas de comisiones
   const now = new Date();
   const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  // Ver si ya existe un registro para este mes
   const { data: comisionExistente } = await supabaseAdmin
     .from('comisiones')
     .select('*')
@@ -632,7 +629,6 @@ app.post('/api/approve-request', async (req, res) => {
     : (sol.metodo_pago === 'saldo' ? PRECIOS.saldo.premium : PRECIOS.tarjeta.premium);
 
   if (comisionExistente) {
-    // Actualizar el existente
     if (sol.metodo_pago === 'saldo') {
       await supabaseAdmin
         .from('comisiones')
@@ -645,7 +641,6 @@ app.post('/api/approve-request', async (req, res) => {
         .eq('id', comisionExistente.id);
     }
   } else {
-    // Crear nuevo registro
     await supabaseAdmin.from('comisiones').insert({
       admin_id: COMISION_ADMIN_ID,
       mes: inicioMes,
@@ -795,7 +790,47 @@ app.post('/api/add-movie', async (req, res) => {
   }
 });
 
-// ================= NUEVOS ENDPOINTS =================
+// Editar película (solo admin)
+app.post('/api/update-movie', async (req, res) => {
+  const { admin_id, movie_id, titulo } = req.body;
+  if (!admin_id || !esAdmin(parseInt(admin_id))) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  if (!movie_id || !titulo) {
+    return res.status(400).json({ error: 'Faltan datos' });
+  }
+  try {
+    await supabaseAdmin
+      .from('peliculas')
+      .update({ titulo })
+      .eq('id', movie_id);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Error actualizando película:', e);
+    res.status(500).json({ error: 'Error al actualizar' });
+  }
+});
+
+// Borrar película (solo admin)
+app.post('/api/delete-movie', async (req, res) => {
+  const { admin_id, movie_id } = req.body;
+  if (!admin_id || !esAdmin(parseInt(admin_id))) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  if (!movie_id) {
+    return res.status(400).json({ error: 'Faltan datos' });
+  }
+  try {
+    await supabaseAdmin
+      .from('peliculas')
+      .delete()
+      .eq('id', movie_id);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Error borrando película:', e);
+    res.status(500).json({ error: 'Error al borrar' });
+  }
+});
 
 // Obtener estadísticas de comisiones (solo admin)
 app.post('/api/estadisticas', async (req, res) => {
@@ -806,7 +841,6 @@ app.post('/api/estadisticas', async (req, res) => {
   const now = new Date();
   const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  // Buscar el registro de este mes
   const { data: comision, error } = await supabaseAdmin
     .from('comisiones')
     .select('*')
@@ -841,7 +875,6 @@ app.post('/api/recoger-comision', async (req, res) => {
   const now = new Date();
   const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  // Marcar la comisión como cobrada
   const { error } = await supabaseAdmin
     .from('comisiones')
     .update({ comision_cobrada: true, fecha_cobro: new Date().toISOString() })
@@ -850,7 +883,7 @@ app.post('/api/recoger-comision', async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
 
-  // Crear un nuevo registro para el próximo mes (inicia en cero)
+  // Crear nuevo registro para el próximo mes
   const proximoMes = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
   await supabaseAdmin.from('comisiones').insert({
     admin_id: COMISION_ADMIN_ID,
