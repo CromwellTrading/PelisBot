@@ -3,504 +3,553 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin CineBot</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>CineBot · Plataforma de Películas</title>
+    <!-- Fuentes modernas -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- Estilos personalizados -->
     <style>
-        body {
-            transition: background-color 0.3s, color 0.3s;
+        /* ===== RESET Y VARIABLES ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.5s ease, color 0.3s ease;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* ===== TEMA FUTURISTA (por defecto) ===== */
+        body.futurista {
+            background: radial-gradient(circle at 30% 30%, #0b1120, #030712);
+            color: #e2e8f0;
+            --card-bg: rgba(17, 25, 40, 0.75);
+            --card-border: 1px solid rgba(0, 255, 255, 0.2);
+            --card-shadow: 0 20px 30px -10px rgba(0, 255, 255, 0.15), 0 0 0 1px rgba(0, 255, 255, 0.1) inset;
+            --btn-gradient: linear-gradient(135deg, #00c6fb, #005bea);
+            --btn-hover: linear-gradient(135deg, #00a3cc, #0040a0);
+            --accent: #00f0ff;
+            --text-secondary: #a0aec0;
+        }
+        body.futurista .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: var(--card-border);
+            box-shadow: var(--card-shadow);
+        }
+        body.futurista .btn {
+            background: var(--btn-gradient);
+            border: none;
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 200, 255, 0.3);
+        }
+        body.futurista .btn:hover {
+            background: var(--btn-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 200, 255, 0.5);
+        }
+
+        /* ===== TEMA MINIMALISTA ===== */
+        body.minimalista {
+            background: #f9fafb;
+            color: #1f2937;
+            --card-bg: #ffffff;
+            --card-border: 1px solid #e5e7eb;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --btn-gradient: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+            --btn-hover: linear-gradient(135deg, #e5e7eb, #d1d5db);
+            --accent: #3b82f6;
+            --text-secondary: #6b7280;
+        }
+        body.minimalista .card {
+            background: var(--card-bg);
+            border: var(--card-border);
+            box-shadow: var(--card-shadow);
+        }
+        body.minimalista .btn {
+            background: var(--btn-gradient);
+            border: 1px solid #d1d5db;
+            color: #1f2937;
+        }
+        body.minimalista .btn:hover {
+            background: var(--btn-hover);
+        }
+
+        /* ===== TEMA MEDIEVAL ===== */
+        body.medieval {
+            background: #2e241b url('data:image/svg+xml;utf8,<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"><path d="M30 5 L55 20 L55 45 L30 60 L5 45 L5 20 Z" fill="%233d2e1f" opacity="0.2"/></svg>');
+            color: #f0e6d2;
+            --card-bg: rgba(58, 42, 30, 0.85);
+            --card-border: 2px solid #b59d7a;
+            --card-shadow: 0 20px 30px -10px #1a0f07, 0 0 0 2px #8b7355 inset;
+            --btn-gradient: linear-gradient(135deg, #8b5a2b, #5d3a1a);
+            --btn-hover: linear-gradient(135deg, #9b6a3b, #6d4a2a);
+            --accent: #d4af37;
+            --text-secondary: #c0b09a;
+        }
+        body.medieval .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(5px);
+            border: var(--card-border);
+            box-shadow: var(--card-shadow);
+        }
+        body.medieval .btn {
+            background: var(--btn-gradient);
+            border: 1px solid #b59d7a;
+            color: #f0e6d2;
+            font-family: 'Times New Roman', serif;
+            box-shadow: 0 5px 0 #3f2c14;
+        }
+        body.medieval .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 0 #3f2c14;
+        }
+
+        /* ===== ESTILOS COMUNES ===== */
         .card {
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 10px 30px -5px rgba(0,0,0,0.3);
-            transition: transform 0.2s, box-shadow 0.2s;
+            border-radius: 24px;
+            padding: 1.5rem;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 35px -5px rgba(0,0,0,0.5);
+            transform: translateY(-6px);
         }
         .btn {
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px -5px rgba(0,0,0,0.5);
-        }
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        /* Temas */
-        body.dark {
-            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-            color: #f7fafc;
-        }
-        body.dark .card {
-            background: rgba(26, 32, 44, 0.8);
-        }
-        body.light {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            color: #1a202c;
-        }
-        body.light .card {
-            background: rgba(255,255,255,0.7);
-            border-color: rgba(0,0,0,0.1);
-        }
-        /* Pestañas */
-        .tab {
+            padding: 0.75rem 1.5rem;
+            border-radius: 40px;
+            font-weight: 600;
+            cursor: pointer;
             transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: none;
+            font-size: 0.95rem;
         }
-        .tab.active {
-            border-bottom: 3px solid #8b5cf6;
-            font-weight: bold;
+        .btn:active {
+            transform: scale(0.97);
+        }
+        .grid-catalogo {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        .pelicula-card {
+            cursor: pointer;
+            text-align: center;
+        }
+        .pelicula-card i {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+            color: var(--accent);
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background: rgba(255,255,255,0.1);
+        }
+        .tema-selector {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        .tema-btn {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            border: 2px solid white;
+            cursor: pointer;
+            transition: transform 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .tema-btn:hover {
+            transform: scale(1.1);
+        }
+        .tema-btn.futurista { background: linear-gradient(145deg, #00c6fb, #005bea); }
+        .tema-btn.minimalista { background: #f9fafb; border-color: #1f2937; }
+        .tema-btn.medieval { background: #8b5a2b; }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent), #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background: rgba(255,255,255,0.1);
+            padding: 0.5rem 1.5rem;
+            border-radius: 40px;
+            backdrop-filter: blur(5px);
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            font-size: 1.2rem;
         }
     </style>
 </head>
-<body class="dark">
-    <div class="container mx-auto px-4 py-8 fade-in">
-        <!-- Header -->
-        <div class="flex justify-between items-center mb-8">
-            <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-600 text-transparent bg-clip-text">
-                🎬 CineBot Admin
-            </h1>
-            <div class="flex gap-4">
-                <button onclick="cambiarTema('dark')" class="btn px-4 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-700">
-                    <i class="fas fa-moon"></i> Oscuro
-                </button>
-                <button onclick="cambiarTema('light')" class="btn px-4 py-2 rounded-lg bg-yellow-300 text-gray-800 hover:bg-yellow-400">
-                    <i class="fas fa-sun"></i> Claro
-                </button>
+<body class="futurista">
+    <!-- Selector de temas flotante -->
+    <div class="tema-selector">
+        <div class="tema-btn futurista" onclick="cambiarTema('futurista')" title="Futurista"></div>
+        <div class="tema-btn minimalista" onclick="cambiarTema('minimalista')" title="Minimalista"></div>
+        <div class="tema-btn medieval" onclick="cambiarTema('medieval')" title="Medieval"></div>
+    </div>
+
+    <div class="container">
+        <!-- Header dinámico -->
+        <div class="header">
+            <div class="logo">🎬 CineBot</div>
+            <div id="userDisplay" class="user-info">
+                <i class="fas fa-spinner fa-pulse"></i> Cargando...
             </div>
         </div>
 
-        <!-- Login Section -->
-        <div id="loginSection" class="card rounded-2xl p-8 max-w-md mx-auto">
-            <h2 class="text-2xl mb-4"><i class="fas fa-lock mr-2"></i>Acceso Administrador</h2>
-            <input type="password" id="password" placeholder="Contraseña" class="w-full p-3 rounded-lg bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 mb-4">
-            <button onclick="login()" class="btn w-full bg-gradient-to-r from-green-400 to-blue-500 text-white py-3 rounded-lg font-bold">
-                <i class="fas fa-sign-in-alt mr-2"></i>Entrar
-            </button>
-        </div>
-
-        <!-- Dashboard Section (visible tras login) -->
-        <div id="dashboardSection" class="hidden">
-            <!-- Pestañas -->
-            <div class="flex border-b border-gray-300 dark:border-gray-700 mb-6">
-                <button class="tab active px-6 py-3 text-lg" onclick="cambiarPestana('solicitudes')">
-                    <i class="fas fa-clock mr-2"></i>Solicitudes
-                </button>
-                <button class="tab px-6 py-3 text-lg" onclick="cambiarPestana('catalogo')">
-                    <i class="fas fa-film mr-2"></i>Catálogo
-                </button>
-                <button class="tab px-6 py-3 text-lg" onclick="cambiarPestana('usuarios')">
-                    <i class="fas fa-users mr-2"></i>Usuarios
-                </button>
-                <button class="ml-auto px-4 py-2 bg-red-600 text-white rounded-lg" onclick="logout()">
-                    <i class="fas fa-sign-out-alt mr-1"></i> Salir
-                </button>
-            </div>
-
-            <!-- Contenido de Solicitudes -->
-            <div id="solicitudesTab" class="tab-content">
-                <div class="mb-6 flex justify-between items-center">
-                    <h2 class="text-2xl"><i class="fas fa-tachometer-alt mr-2"></i>Solicitudes Pendientes</h2>
-                    <button onclick="cargarSolicitudes()" class="btn px-4 py-2 bg-blue-600 text-white rounded-lg">
-                        <i class="fas fa-sync-alt mr-1"></i> Actualizar
-                    </button>
-                </div>
-                <div id="solicitudesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Se llena con JS -->
-                </div>
-            </div>
-
-            <!-- Contenido de Catálogo -->
-            <div id="catalogoTab" class="tab-content hidden">
-                <div class="mb-6 flex flex-wrap gap-4 items-center justify-between">
-                    <h2 class="text-2xl"><i class="fas fa-film mr-2"></i>Catálogo de Películas</h2>
-                    <div class="flex gap-2">
-                        <input type="text" id="searchCatalogo" placeholder="Buscar..." class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">
-                        <button onclick="buscarCatalogo()" class="btn px-4 py-2 bg-blue-600 text-white rounded-lg">
-                            <i class="fas fa-search"></i>
-                        </button>
-                        <button onclick="mostrarFormAgregar()" class="btn px-4 py-2 bg-green-600 text-white rounded-lg">
-                            <i class="fas fa-plus"></i> Agregar
-                        </button>
-                    </div>
-                </div>
-                <!-- Formulario agregar película (oculto) -->
-                <div id="formAgregar" class="card p-6 mb-6 hidden">
-                    <h3 class="text-xl mb-4">Agregar nueva película</h3>
-                    <input type="text" id="nuevoTitulo" placeholder="Título" class="w-full p-3 rounded-lg bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 mb-3">
-                    <input type="number" id="nuevoMessageId" placeholder="Message ID" class="w-full p-3 rounded-lg bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 mb-3">
-                    <div class="flex gap-2">
-                        <button onclick="agregarPelicula()" class="btn px-4 py-2 bg-green-600 text-white rounded-lg">Guardar</button>
-                        <button onclick="cancelarAgregar()" class="btn px-4 py-2 bg-gray-600 text-white rounded-lg">Cancelar</button>
-                    </div>
-                </div>
-                <!-- Lista de películas -->
-                <div id="catalogoContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Se llena con JS -->
-                </div>
-                <!-- Paginación -->
-                <div id="catalogoPaginacion" class="flex justify-center mt-6 gap-2">
-                    <!-- Botones de página -->
-                </div>
-            </div>
-
-            <!-- Contenido de Usuarios -->
-            <div id="usuariosTab" class="tab-content hidden">
-                <div class="mb-6 flex justify-between items-center">
-                    <h2 class="text-2xl"><i class="fas fa-users mr-2"></i>Usuarios Activos</h2>
-                    <button onclick="cargarUsuarios()" class="btn px-4 py-2 bg-blue-600 text-white rounded-lg">
-                        <i class="fas fa-sync-alt mr-1"></i> Actualizar
-                    </button>
-                </div>
-                <div id="usuariosContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Se llena con JS -->
-                </div>
-                <div id="usuariosPaginacion" class="flex justify-center mt-6 gap-2">
-                    <!-- Botones de página -->
-                </div>
-            </div>
+        <!-- Contenido principal -->
+        <div id="mainContent" class="loading">
+            <i class="fas fa-spinner fa-pulse fa-3x"></i>
+            <p>Cargando plataforma...</p>
         </div>
     </div>
 
     <script>
-        // ===== IMPORTANTE: REEMPLAZA ESTAS VARIABLES CON TUS DATOS DE SUPABASE =====
-        const SUPABASE_URL = 'https://tuproyecto.supabase.co';
-        const SUPABASE_ANON_KEY = 'tu-anon-key';
-        // ===========================================================================
-
+        // ========== CONFIGURACIÓN ==========
         const API_BASE = window.location.origin;
-        let currentPageCatalogo = 1;
-        let currentSearchCatalogo = '';
-        let currentPageUsuarios = 1;
 
-        // Verificar autenticación al cargar
-        window.onload = async function() {
-            const temaGuardado = localStorage.getItem('tema') || 'dark';
-            cambiarTema(temaGuardado);
+        // Obtener ID de Telegram de la URL (parámetro tg_id)
+        const urlParams = new URLSearchParams(window.location.search);
+        const TELEGRAM_ID = urlParams.get('tg_id');
 
-            const auth = await fetch(API_BASE + '/check-auth', { credentials: 'include' }).then(r => r.json());
-            if (auth.authenticated) {
-                document.getElementById('loginSection').classList.add('hidden');
-                document.getElementById('dashboardSection').classList.remove('hidden');
-                cargarSolicitudes();
-                cargarCatalogo();
-                cargarUsuarios();
-            }
-        };
+        // Estado global
+        let usuario = null; // { activo, plan, es_admin, ... }
+        let currentPage = 1;
+        let currentSearch = '';
 
+        // ========== FUNCIONES ==========
         function cambiarTema(tema) {
             document.body.className = tema;
             localStorage.setItem('tema', tema);
         }
 
-        function cambiarPestana(pestana) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-            document.getElementById(pestana + 'Tab').classList.remove('hidden');
-            event.target.classList.add('active');
+        // Cargar tema guardado
+        const temaGuardado = localStorage.getItem('tema') || 'futurista';
+        cambiarTema(temaGuardado);
+
+        // Identificación automática
+        async function identificarUsuario() {
+            if (!TELEGRAM_ID) {
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="card" style="text-align: center; max-width: 500px; margin: 2rem auto;">
+                        <i class="fas fa-exclamation-triangle fa-3x" style="color: #f59e0b;"></i>
+                        <h2 style="margin: 1rem 0;">No se pudo identificar</h2>
+                        <p>Para usar la webapp, ábrela desde el bot de Telegram.</p>
+                        <a href="https://t.me/your_bot_username" target="_blank" class="btn" style="margin-top: 1rem;">
+                            <i class="fab fa-telegram"></i> Ir al bot
+                        </a>
+                    </div>
+                `;
+                return;
+            }
+
+            try {
+                const res = await fetch(API_BASE + '/api/user-status', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({telegram_id: TELEGRAM_ID})
+                });
+                const data = await res.json();
+                usuario = { id: TELEGRAM_ID, ...data };
+                actualizarInterfaz();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('mainContent').innerHTML = '<p class="card">Error de conexión. Intenta de nuevo.</p>';
+            }
         }
 
-        async function login() {
-            const pwd = document.getElementById('password').value;
-            const res = await fetch(API_BASE + '/login', {
+        function actualizarInterfaz() {
+            // Mostrar info del usuario
+            const userDisplay = document.getElementById('userDisplay');
+            if (usuario.activo) {
+                userDisplay.innerHTML = `
+                    <i class="fas fa-check-circle" style="color: #10b981;"></i>
+                    <span>Plan ${usuario.plan} activo</span>
+                    <span class="badge">🎟️ ${new Date(usuario.expiracion).toLocaleDateString()}</span>
+                `;
+            } else {
+                userDisplay.innerHTML = `
+                    <i class="fas fa-clock" style="color: #f59e0b;"></i>
+                    <span>Suscripción inactiva</span>
+                `;
+            }
+
+            if (usuario.es_admin) {
+                mostrarPanelAdmin();
+            } else if (usuario.activo) {
+                mostrarCatalogo();
+            } else {
+                mostrarPlanesPago();
+            }
+        }
+
+        function mostrarPlanesPago() {
+            document.getElementById('mainContent').innerHTML = `
+                <div class="card" style="text-align: center;">
+                    <h2 style="font-size: 2rem; margin-bottom: 1rem;">Elige tu plan</h2>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-top: 2rem;">
+                        <div class="card" style="padding: 2rem;">
+                            <i class="fas fa-ticket-alt fa-3x" style="color: var(--accent);"></i>
+                            <h3 style="font-size: 1.8rem; margin: 1rem 0;">Clásico</h3>
+                            <p style="font-size: 2.5rem; font-weight: 800;">200 CUP</p>
+                            <p style="opacity: 0.8;">(Saldo: 120 CUP)</p>
+                            <button onclick="mostrarFormPago('clasico')" class="btn" style="margin-top: 1.5rem; width: 100%;">
+                                Seleccionar
+                            </button>
+                        </div>
+                        <div class="card" style="padding: 2rem;">
+                            <i class="fas fa-star fa-3x" style="color: #fbbf24;"></i>
+                            <h3 style="font-size: 1.8rem; margin: 1rem 0;">Premium</h3>
+                            <p style="font-size: 2.5rem; font-weight: 800;">350 CUP</p>
+                            <p style="opacity: 0.8;">(Saldo: 200 CUP)</p>
+                            <button onclick="mostrarFormPago('premium')" class="btn" style="margin-top: 1.5rem; width: 100%;">
+                                Seleccionar
+                            </button>
+                        </div>
+                    </div>
+                    <div id="formPagoContainer" style="margin-top: 2rem;"></div>
+                </div>
+            `;
+        }
+
+        function mostrarFormPago(plan) {
+            const container = document.getElementById('formPagoContainer');
+            container.innerHTML = `
+                <div class="card" style="max-width: 600px; margin: 0 auto;">
+                    <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Pago plan ${plan}</h3>
+                    <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
+                        <p><strong>Métodos de pago:</strong></p>
+                        <ul style="list-style: none; margin-top: 0.5rem;">
+                            <li>🏦 BPA: 9248-1299-7027-1730 / 63806513</li>
+                            <li>🏧 METRO: 9238959871181386 / 63806513</li>
+                            <li>📱 Monedero: 63806513</li>
+                            <li>📞 Saldo: 63806513</li>
+                        </ul>
+                    </div>
+                    <select id="metodoPago" class="btn" style="width: 100%; margin-bottom: 1rem; background: rgba(255,255,255,0.1);">
+                        <option value="tarjeta">Tarjeta / Monedero</option>
+                        <option value="saldo">Saldo Móvil</option>
+                    </select>
+                    <input type="file" id="captura" accept="image/*" style="width: 100%; padding: 0.5rem; margin-bottom: 1rem;">
+                    <button onclick="enviarCaptura('${plan}')" class="btn" style="width: 100%;">
+                        <i class="fas fa-upload"></i> Enviar comprobante
+                    </button>
+                </div>
+            `;
+        }
+
+        async function enviarCaptura(plan) {
+            const file = document.getElementById('captura').files[0];
+            const metodo = document.getElementById('metodoPago').value;
+            if (!file) return alert('Selecciona una captura');
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const res = await fetch(API_BASE + '/api/submit-payment', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        telegram_id: TELEGRAM_ID,
+                        plan: plan,
+                        metodo: metodo,
+                        imagen: e.target.result
+                    })
+                });
+                if (res.ok) {
+                    alert('✅ Solicitud enviada. Espera la aprobación.');
+                    document.getElementById('formPagoContainer').innerHTML = '';
+                } else {
+                    alert('❌ Error al enviar');
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ========== CATÁLOGO PARA USUARIOS ACTIVOS ==========
+        function mostrarCatalogo() {
+            document.getElementById('mainContent').innerHTML = `
+                <div class="card">
+                    <h2 style="font-size: 2rem; margin-bottom: 1.5rem;">🎥 Catálogo de Películas</h2>
+                    <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+                        <input type="text" id="buscador" placeholder="Buscar por título..." 
+                               style="flex: 1; padding: 1rem; border-radius: 40px; border: none; background: rgba(255,255,255,0.1);">
+                        <button onclick="buscarPeliculas(1)" class="btn">
+                            <i class="fas fa-search"></i> Buscar
+                        </button>
+                    </div>
+                    <div id="catalogoGrid" class="grid-catalogo"></div>
+                    <div id="paginacion" style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 2rem;"></div>
+                </div>
+            `;
+            buscarPeliculas(1);
+        }
+
+        async function buscarPeliculas(page = 1) {
+            currentPage = page;
+            currentSearch = document.getElementById('buscador')?.value || '';
+            const res = await fetch(API_BASE + '/api/catalogo', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({password: pwd}),
-                credentials: 'include'
+                body: JSON.stringify({
+                    telegram_id: TELEGRAM_ID,
+                    page: currentPage,
+                    search: currentSearch
+                })
             });
-            if (res.ok) {
-                document.getElementById('loginSection').classList.add('hidden');
-                document.getElementById('dashboardSection').classList.remove('hidden');
-                cargarSolicitudes();
-                cargarCatalogo();
-                cargarUsuarios();
-            } else {
-                alert('Contraseña incorrecta');
-            }
-        }
-
-        async function logout() {
-            await fetch(API_BASE + '/logout', {method: 'POST', credentials: 'include'});
-            document.getElementById('loginSection').classList.remove('hidden');
-            document.getElementById('dashboardSection').classList.add('hidden');
-        }
-
-        // ================= SOLICITUDES =================
-        async function cargarSolicitudes() {
-            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-            const { data, error } = await supabase
-                .from('solicitudes_pago')
-                .select('*')
-                .eq('estado', 'pendiente')
-                .order('created_at', { ascending: false });
-            if (error) {
-                console.error(error);
-                alert('Error al cargar solicitudes');
-                return;
-            }
-            renderSolicitudes(data);
-        }
-
-        function renderSolicitudes(solicitudes) {
-            const container = document.getElementById('solicitudesContainer');
-            if (solicitudes.length === 0) {
-                container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No hay solicitudes pendientes</div>';
-                return;
-            }
-            container.innerHTML = '';
-            solicitudes.forEach(sol => {
-                const card = document.createElement('div');
-                card.className = 'card rounded-xl p-6 space-y-3';
-                card.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <h3 class="font-bold text-lg">Usuario: ${sol.telegram_id}</h3>
-                            <p class="text-sm opacity-75">Plan: ${sol.plan_solicitado}</p>
-                            <p class="text-sm opacity-75">Método: ${sol.metodo_pago}</p>
-                        </div>
-                        <span class="px-2 py-1 bg-yellow-500 text-xs rounded-full">Pendiente</span>
-                    </div>
-                    <div class="relative group">
-                        <img src="${sol.captura_url}" alt="Captura" class="rounded-lg w-full h-40 object-cover cursor-pointer" onclick="window.open('${sol.captura_url}', '_blank')">
-                        <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition flex items-center justify-center">
-                            <i class="fas fa-search-plus text-white opacity-0 group-hover:opacity-100 text-2xl"></i>
-                        </div>
-                    </div>
-                    <div class="flex gap-2 mt-4">
-                        <button onclick="aprobarSolicitud('${sol.id}', ${sol.telegram_id}, '${sol.plan_solicitado}')" class="btn flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">
-                            <i class="fas fa-check mr-1"></i> Aprobar
-                        </button>
-                        <button onclick="rechazarSolicitud('${sol.id}', ${sol.telegram_id})" class="btn flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg">
-                            <i class="fas fa-times mr-1"></i> Rechazar
-                        </button>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        async function aprobarSolicitud(id, telegram_id, plan) {
-            if (!confirm('¿Aprobar esta solicitud? Se activará la suscripción por 30 días.')) return;
-
-            try {
-                const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-                // 1. Actualizar solicitud
-                const { error: updateError } = await supabase
-                    .from('solicitudes_pago')
-                    .update({ estado: 'aprobado' })
-                    .eq('id', id);
-                if (updateError) throw updateError;
-
-                // 2. Calcular fechas
-                const fechaInicio = new Date();
-                const fechaExpiracion = new Date();
-                fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
-
-                // 3. Upsert usuario
-                const { error: upsertError } = await supabase
-                    .from('usuarios')
-                    .upsert({
-                        telegram_id: telegram_id,
-                        plan: plan,
-                        fecha_inicio: fechaInicio.toISOString(),
-                        fecha_expiracion: fechaExpiracion.toISOString()
-                    }, { onConflict: 'telegram_id' });
-                if (upsertError) throw upsertError;
-
-                // 4. Notificar al usuario vía el bot
-                await fetch(API_BASE + '/notify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        telegram_id: telegram_id,
-                        mensaje: `✅ **¡Pago aprobado!**\n\nTu suscripción **${plan}** está activa hasta el ${fechaExpiracion.toLocaleDateString()}.\n¡Disfruta del catálogo! 🍿`
-                    }),
-                    credentials: 'include'
-                });
-
-                alert('Solicitud aprobada y usuario notificado.');
-                cargarSolicitudes();
-            } catch (e) {
-                console.error(e);
-                alert('Error al aprobar');
-            }
-        }
-
-        async function rechazarSolicitud(id, telegram_id) {
-            const motivo = prompt('Motivo del rechazo:');
-            if (motivo === null) return;
-            try {
-                const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-                await supabase
-                    .from('solicitudes_pago')
-                    .update({ estado: 'rechazado', motivo_rechazo: motivo })
-                    .eq('id', id);
-
-                await fetch(API_BASE + '/notify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        telegram_id: telegram_id,
-                        mensaje: `❌ **Pago rechazado**\n\nMotivo: ${motivo}\n\nPuedes intentar nuevamente con otro comprobante.`
-                    }),
-                    credentials: 'include'
-                });
-
-                alert('Solicitud rechazada.');
-                cargarSolicitudes();
-            } catch (e) {
-                console.error(e);
-                alert('Error al rechazar');
-            }
-        }
-
-        // ================= CATÁLOGO =================
-        async function cargarCatalogo(page = 1, search = '') {
-            currentPageCatalogo = page;
-            currentSearchCatalogo = search;
-            const url = `${API_BASE}/api/movies?page=${page}&limit=10&search=${encodeURIComponent(search)}`;
-            const res = await fetch(url, { credentials: 'include' });
             if (!res.ok) {
-                if (res.status === 401) logout();
-                else alert('Error al cargar catálogo');
+                alert('No tienes suscripción activa');
                 return;
             }
             const data = await res.json();
-            renderCatalogo(data.data);
-            renderPaginacionCatalogo(data.total, data.page, data.limit);
+            renderCatalogo(data.data, data.total, data.page);
         }
 
-        function renderCatalogo(peliculas) {
-            const container = document.getElementById('catalogoContainer');
-            if (peliculas.length === 0) {
-                container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No hay películas</div>';
+        function renderCatalogo(peliculas, total, page) {
+            const grid = document.getElementById('catalogoGrid');
+            if (!peliculas.length) {
+                grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">No hay películas</p>';
                 return;
             }
-            container.innerHTML = '';
-            peliculas.forEach(p => {
-                const card = document.createElement('div');
-                card.className = 'card rounded-xl p-6';
-                card.innerHTML = `
-                    <h3 class="font-bold text-lg mb-2">${p.titulo}</h3>
-                    <p class="text-sm opacity-75">Message ID: ${p.message_id}</p>
-                    <p class="text-xs opacity-50">ID: ${p.id}</p>
-                `;
-                container.appendChild(card);
-            });
-        }
+            grid.innerHTML = peliculas.map(p => `
+                <div class="card pelicula-card" onclick="solicitarPelicula('${p.id}')">
+                    <i class="fas fa-film"></i>
+                    <h3 style="font-weight: 600; margin-bottom: 0.5rem;">${p.titulo}</h3>
+                    <p style="font-size: 0.8rem; opacity: 0.7;">ID: ${p.id.substring(0,6)}</p>
+                </div>
+            `).join('');
 
-        function renderPaginacionCatalogo(total, page, limit) {
-            const totalPages = Math.ceil(total / limit);
-            const paginacion = document.getElementById('catalogoPaginacion');
-            paginacion.innerHTML = '';
+            const totalPages = Math.ceil(total / 10);
+            const pagDiv = document.getElementById('paginacion');
+            pagDiv.innerHTML = '';
             for (let i = 1; i <= totalPages; i++) {
-                const btn = document.createElement('button');
-                btn.className = `px-3 py-1 rounded-lg ${i === page ? 'bg-purple-600 text-white' : 'bg-gray-300 dark:bg-gray-700'}`;
-                btn.innerText = i;
-                btn.onclick = () => cargarCatalogo(i, currentSearchCatalogo);
-                paginacion.appendChild(btn);
+                pagDiv.innerHTML += `<button onclick="buscarPeliculas(${i})" class="btn" style="padding: 0.5rem 1rem; ${i === page ? 'background: var(--accent);' : ''}">${i}</button>`;
             }
         }
 
-        function buscarCatalogo() {
-            const search = document.getElementById('searchCatalogo').value;
-            cargarCatalogo(1, search);
-        }
-
-        function mostrarFormAgregar() {
-            document.getElementById('formAgregar').classList.remove('hidden');
-        }
-
-        function cancelarAgregar() {
-            document.getElementById('formAgregar').classList.add('hidden');
-        }
-
-        async function agregarPelicula() {
-            const titulo = document.getElementById('nuevoTitulo').value;
-            const message_id = document.getElementById('nuevoMessageId').value;
-            if (!titulo || !message_id) {
-                alert('Completa todos los campos');
-                return;
-            }
-            const res = await fetch(API_BASE + '/api/movies', {
+        async function solicitarPelicula(peliculaId) {
+            if (!confirm('¿Enviar esta película a tu Telegram?')) return;
+            const res = await fetch(API_BASE + '/api/request-movie', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ titulo, message_id: parseInt(message_id) }),
-                credentials: 'include'
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    telegram_id: TELEGRAM_ID,
+                    pelicula_id: peliculaId
+                })
             });
-            if (res.ok) {
-                alert('Película agregada');
-                document.getElementById('nuevoTitulo').value = '';
-                document.getElementById('nuevoMessageId').value = '';
-                document.getElementById('formAgregar').classList.add('hidden');
-                cargarCatalogo(1, '');
-            } else {
-                alert('Error al agregar');
-            }
+            if (res.ok) alert('✅ Revisa tu chat de Telegram');
+            else alert('❌ Error al enviar');
         }
 
-        // ================= USUARIOS =================
-        async function cargarUsuarios(page = 1) {
-            currentPageUsuarios = page;
-            const url = `${API_BASE}/api/users?page=${page}&limit=10`;
-            const res = await fetch(url, { credentials: 'include' });
-            if (!res.ok) {
-                if (res.status === 401) logout();
-                else alert('Error al cargar usuarios');
+        // ========== PANEL DE ADMIN ==========
+        function mostrarPanelAdmin() {
+            document.getElementById('mainContent').innerHTML = `
+                <div class="card">
+                    <h2 style="font-size: 2rem; margin-bottom: 1.5rem;"><i class="fas fa-crown" style="color: #fbbf24;"></i> Panel de Administración</h2>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem;">
+                        <button onclick="cargarSolicitudes()" class="btn"><i class="fas fa-clock"></i> Solicitudes pendientes</button>
+                        <button onclick="cargarUsuarios()" class="btn"><i class="fas fa-users"></i> Usuarios</button>
+                        <button onclick="mostrarCatalogoAdmin()" class="btn"><i class="fas fa-film"></i> Catálogo</button>
+                    </div>
+                    <div id="adminContent"></div>
+                </div>
+            `;
+            cargarSolicitudes(); // Por defecto
+        }
+
+        async function cargarSolicitudes() {
+            const res = await fetch(API_BASE + '/api/pending-requests', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({telegram_id: TELEGRAM_ID})
+            });
+            if (!res.ok) return alert('No autorizado');
+            const solicitudes = await res.json();
+            const adminDiv = document.getElementById('adminContent');
+            if (!solicitudes.length) {
+                adminDiv.innerHTML = '<p>No hay solicitudes pendientes.</p>';
                 return;
             }
-            const data = await res.json();
-            renderUsuarios(data.data);
-            renderPaginacionUsuarios(data.total, data.page, data.limit);
+            adminDiv.innerHTML = solicitudes.map(s => `
+                <div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap;">
+                        <div>
+                            <p><strong>Usuario:</strong> ${s.telegram_id}</p>
+                            <p><strong>Plan:</strong> ${s.plan_solicitado}</p>
+                            <p><strong>Método:</strong> ${s.metodo_pago}</p>
+                            <p><strong>Fecha:</strong> ${new Date(s.created_at).toLocaleString()}</p>
+                        </div>
+                        <img src="${s.captura_url}" alt="Captura" style="max-height: 120px; border-radius: 8px;">
+                    </div>
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                        <button onclick="aprobarSolicitud('${s.id}')" class="btn" style="background: #10b981;">Aprobar</button>
+                        <button onclick="rechazarSolicitud('${s.id}')" class="btn" style="background: #ef4444;">Rechazar</button>
+                    </div>
+                </div>
+            `).join('');
         }
 
-        function renderUsuarios(usuarios) {
-            const container = document.getElementById('usuariosContainer');
-            if (usuarios.length === 0) {
-                container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No hay usuarios</div>';
-                return;
-            }
-            container.innerHTML = '';
-            usuarios.forEach(u => {
-                const expiracion = new Date(u.fecha_expiracion).toLocaleDateString();
-                const diasRestantes = Math.ceil((new Date(u.fecha_expiracion) - new Date()) / (1000*60*60*24));
-                const card = document.createElement('div');
-                card.className = 'card rounded-xl p-6';
-                card.innerHTML = `
-                    <h3 class="font-bold text-lg">Usuario: ${u.telegram_id}</h3>
-                    <p>Plan: ${u.plan}</p>
-                    <p>Expira: ${expiracion}</p>
-                    <p>Días restantes: ${diasRestantes}</p>
-                `;
-                container.appendChild(card);
+        async function aprobarSolicitud(id) {
+            if (!confirm('¿Aprobar esta solicitud?')) return;
+            await fetch(API_BASE + '/api/approve-request', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({admin_id: TELEGRAM_ID, solicitud_id: id})
             });
+            cargarSolicitudes();
         }
 
-        function renderPaginacionUsuarios(total, page, limit) {
-            const totalPages = Math.ceil(total / limit);
-            const paginacion = document.getElementById('usuariosPaginacion');
-            paginacion.innerHTML = '';
-            for (let i = 1; i <= totalPages; i++) {
-                const btn = document.createElement('button');
-                btn.className = `px-3 py-1 rounded-lg ${i === page ? 'bg-purple-600 text-white' : 'bg-gray-300 dark:bg-gray-700'}`;
-                btn.innerText = i;
-                btn.onclick = () => cargarUsuarios(i);
-                paginacion.appendChild(btn);
-            }
+        async function rechazarSolicitud(id) {
+            const motivo = prompt('Motivo del rechazo:');
+            if (!motivo) return;
+            await fetch(API_BASE + '/api/reject-request', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({admin_id: TELEGRAM_ID, solicitud_id: id, motivo})
+            });
+            cargarSolicitudes();
         }
+
+        // Iniciar
+        identificarUsuario();
     </script>
 </body>
 </html>
