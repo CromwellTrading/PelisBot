@@ -88,55 +88,66 @@ function getMainKeyboard(userId, tieneSuscripcion) {
 
 // ================= HANDLERS DEL BOT =================
 
-// Comando /start
+// Comando /start - VERSIÓN ROBUSTA
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const firstName = msg.from.first_name;
 
-  const usuario = await obtenerUsuario(userId);
-  const activo = await usuarioActivo(userId);
+  try {
+    // Intentar obtener información del usuario
+    const usuario = await obtenerUsuario(userId);
+    const activo = await usuarioActivo(userId);
 
-  const keyboard = getMainKeyboard(userId, activo);
+    const keyboard = getMainKeyboard(userId, activo);
 
-  if (activo) {
-    const expiracion = new Date(usuario.fecha_expiracion);
-    const diasRestantes = Math.ceil((expiracion - new Date()) / (1000 * 60 * 60 * 24));
-    const mensaje = 
-      `✨ ¡Bienvenido de nuevo, ${firstName}! ✨\n\n` +
-      `🎬 **Tu membresía VIP**\n` +
-      `   Plan: **${usuario.plan === 'clasico' ? '⚜️ Clásico' : '💎 Premium'}**\n` +
-      `   📅 Activo hasta: ${expiracion.toLocaleDateString()}\n` +
-      `   ⏳ Días restantes: ${diasRestantes}\n\n` +
-      `🔍 **¿Cómo buscar?**\n` +
-      `   • Presiona el botón **"🔍 Buscar"** y luego escribe el nombre.\n` +
-      `   • También puedes usar la **webapp** para una experiencia mejorada.\n\n` +
-      `💡 ¿No encuentras una película? Usa **"💡 Sugerir película"** para pedirla.\n\n` +
-      `🔐 ¿Necesitas una VPN? Prueba nuestro bot **@vpncubaw_bot** (botón "🔐 VPN").\n\n` +
-      `🎉 Disfruta de tu experiencia VIP.`;
+    if (activo && usuario) {
+      const expiracion = new Date(usuario.fecha_expiracion);
+      const diasRestantes = Math.ceil((expiracion - new Date()) / (1000 * 60 * 60 * 24));
+      const mensaje = 
+        `✨ ¡Bienvenido de nuevo, ${firstName}! ✨\n\n` +
+        `🎬 **Tu membresía VIP**\n` +
+        `   Plan: **${usuario.plan === 'clasico' ? '⚜️ Clásico' : '💎 Premium'}**\n` +
+        `   📅 Activo hasta: ${expiracion.toLocaleDateString()}\n` +
+        `   ⏳ Días restantes: ${diasRestantes}\n\n` +
+        `🔍 **¿Cómo buscar?**\n` +
+        `   • Presiona el botón **"🔍 Buscar"** y luego escribe el nombre.\n` +
+        `   • También puedes usar la **webapp** para una experiencia mejorada.\n\n` +
+        `💡 ¿No encuentras una película? Usa **"💡 Sugerir película"** para pedirla.\n\n` +
+        `🔐 ¿Necesitas una VPN? Prueba nuestro bot **@vpncubaw_bot** (botón "🔐 VPN").\n\n` +
+        `🎉 Disfruta de tu experiencia VIP.`;
 
-    bot.sendMessage(chatId, mensaje, { 
-      parse_mode: 'Markdown',
-      reply_markup: keyboard 
-    });
-  } else {
-    const mensaje = 
-      `🍿 **CineBot - Tu cine personal** 🍿\n\n` +
-      `Para acceder al catálogo necesitas una suscripción.\n\n` +
-      `⚜️ **Clásico** — ${PRECIOS.tarjeta.clasico} CUP (tarjeta) / ${PRECIOS.saldo.clasico} CUP (saldo)\n` +
-      `   ✅ Catálogo completo\n` +
-      `   ✅ Visualización sin límites\n` +
-      `   ❌ No permite reenviar/guardar\n\n` +
-      `💎 **Premium** — ${PRECIOS.tarjeta.premium} CUP (tarjeta) / ${PRECIOS.saldo.premium} CUP (saldo)\n` +
-      `   ✅ Todo lo del plan Clásico\n` +
-      `   ✅ Reenvío y guardado de películas\n` +
-      `   ✅ Prioridad en solicitudes\n\n` +
-      `Presiona "🎬 Ver planes" para comenzar.`;
+      await bot.sendMessage(chatId, mensaje, { 
+        parse_mode: 'Markdown',
+        reply_markup: keyboard 
+      });
+    } else {
+      const mensaje = 
+        `🍿 **CineBot - Tu cine personal** 🍿\n\n` +
+        `Para acceder al catálogo necesitas una suscripción.\n\n` +
+        `⚜️ **Clásico** — ${PRECIOS.tarjeta.clasico} CUP (tarjeta) / ${PRECIOS.saldo.clasico} CUP (saldo)\n` +
+        `   ✅ Catálogo completo\n` +
+        `   ✅ Visualización sin límites\n` +
+        `   ❌ No permite reenviar/guardar\n\n` +
+        `💎 **Premium** — ${PRECIOS.tarjeta.premium} CUP (tarjeta) / ${PRECIOS.saldo.premium} CUP (saldo)\n` +
+        `   ✅ Todo lo del plan Clásico\n` +
+        `   ✅ Reenvío y guardado de películas\n` +
+        `   ✅ Prioridad en solicitudes\n\n` +
+        `Presiona "🎬 Ver planes" para comenzar.`;
 
-    bot.sendMessage(chatId, mensaje, { 
-      parse_mode: 'Markdown',
-      reply_markup: keyboard 
-    });
+      await bot.sendMessage(chatId, mensaje, { 
+        parse_mode: 'Markdown',
+        reply_markup: keyboard 
+      });
+    }
+  } catch (error) {
+    console.error('Error en /start:', error);
+    // Mensaje de emergencia: el bot responde incluso si todo falla
+    await bot.sendMessage(
+      chatId,
+      `Hola ${firstName}, el bot está activo. Por favor, intenta usar los botones del menú. Si el problema persiste, contacta a un administrador.`,
+      { reply_markup: getMainKeyboard(userId, false) }
+    );
   }
 });
 
