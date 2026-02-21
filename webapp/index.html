@@ -4,316 +4,120 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CineBot · Plataforma de Películas</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
+        * {
             font-family: 'Inter', sans-serif;
-            transition: background-color 0.5s ease, color 0.3s ease;
+        }
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
             min-height: 100vh;
-            line-height: 1.6;
-            position: relative;
-            overflow-x: hidden;
+            color: #f1f5f9;
         }
-        /* Canvas de partículas de fondo */
-        #particles-canvas {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            pointer-events: none;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-            position: relative;
-            z-index: 1;
-        }
-
-        /* Temas (ajustados) */
-        body.futurista {
-            background: radial-gradient(circle at 30% 30%, #0a0f1f, #030614);
-            color: #e0f2fe;
-            --card-bg: rgba(15, 25, 45, 0.7);
-            --card-border: 1px solid rgba(0, 255, 255, 0.2);
-            --card-shadow: 0 20px 30px -10px rgba(0, 255, 255, 0.2), 0 0 0 1px rgba(0, 255, 255, 0.1) inset;
-            --btn-gradient: linear-gradient(135deg, #00c6fb, #005bea);
-            --accent: #00f0ff;
-        }
-        body.minimalista {
-            background: #f5f7fa;
-            color: #1e293b;
-            --card-bg: rgba(255, 255, 255, 0.9);
-            --card-border: 1px solid #e2e8f0;
-            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            --btn-gradient: linear-gradient(135deg, #f1f5f9, #e2e8f0);
-            --accent: #3b82f6;
-        }
-        body.medieval {
-            background: #2b1b0e;
-            color: #f0e6d2;
-            --card-bg: rgba(75, 55, 35, 0.8);
-            --card-border: 2px solid #b59d7a;
-            --card-shadow: 0 20px 30px -10px #1a0f07, 0 0 0 2px #8b7355 inset;
-            --btn-gradient: linear-gradient(135deg, #8b5a2b, #5d3a1a);
-            --accent: #d4af37;
-        }
-
-        .card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: var(--card-border);
-            box-shadow: var(--card-shadow);
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 24px;
-            padding: 1.5rem;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
         }
-        .card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 30px 40px -10px rgba(0,0,0,0.3);
+        .glass-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 30px 50px -15px rgba(0, 150, 255, 0.3);
         }
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border-radius: 40px;
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
             font-weight: 600;
+            padding: 12px 24px;
+            border-radius: 40px;
+            border: none;
             cursor: pointer;
             transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            border: none;
-            font-size: 0.95rem;
-            background: var(--btn-gradient);
-            color: inherit;
         }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        .btn-primary:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 25px -5px #8b5cf6;
         }
-        .grid-catalogo {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-top: 2rem;
-        }
-        .pelicula-card {
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 40px;
             cursor: pointer;
-            text-align: center;
+            transition: all 0.2s;
         }
-        .pelicula-card i {
-            font-size: 3rem;
-            margin-bottom: 0.5rem;
-            color: var(--accent);
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .plan-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 24px;
+        }
+        .plan-card.clasico {
+            border-top: 4px solid #60a5fa;
+        }
+        .plan-card.premium {
+            border-top: 4px solid #fbbf24;
         }
         .badge {
             display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 40px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            background: rgba(255,255,255,0.1);
-        }
-
-        /* Selector de tema mejorado (esquina inferior derecha) */
-        .tema-selector {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            display: flex;
-            gap: 8px;
-            background: rgba(0,0,0,0.3);
-            backdrop-filter: blur(8px);
-            padding: 8px 12px;
-            border-radius: 40px;
-            border: 1px solid rgba(255,255,255,0.2);
-            z-index: 100;
-        }
-        .tema-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border: 2px solid transparent;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .tema-btn:hover {
-            transform: scale(1.15);
-            border-color: white;
-        }
-        .tema-btn.futurista { background: linear-gradient(145deg, #00c6fb, #005bea); }
-        .tema-btn.minimalista { background: #f9fafb; border: 2px solid #1e293b; }
-        .tema-btn.medieval { background: #8b5a2b; }
-
-        /* Botón de vista previa admin/usuario */
-        .view-toggle {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0,0,0,0.3);
-            backdrop-filter: blur(8px);
-            padding: 8px 16px;
-            border-radius: 40px;
-            border: 1px solid rgba(255,255,255,0.2);
-            z-index: 100;
-            display: flex;
-            gap: 8px;
-        }
-        .view-toggle button {
-            background: transparent;
-            border: 1px solid currentColor;
-            color: inherit;
             padding: 4px 12px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.85rem;
-        }
-        .view-toggle button.active {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: black;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-        .logo {
-            font-size: 2.5rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--accent), #a78bfa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            background: rgba(255,255,255,0.1);
-            padding: 0.5rem 1.5rem;
             border-radius: 40px;
-            backdrop-filter: blur(5px);
-        }
-        .loading {
-            text-align: center;
-            padding: 3rem;
-            font-size: 1.2rem;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.1);
         }
     </style>
 </head>
-<body class="futurista">
-    <canvas id="particles-canvas"></canvas>
-
-    <!-- Selector de tema flotante (esquina inferior derecha) -->
-    <div class="tema-selector">
-        <div class="tema-btn futurista" onclick="cambiarTema('futurista')" title="Futurista"></div>
-        <div class="tema-btn minimalista" onclick="cambiarTema('minimalista')" title="Minimalista"></div>
-        <div class="tema-btn medieval" onclick="cambiarTema('medieval')" title="Medieval"></div>
-    </div>
-
-    <!-- Botón para cambiar vista admin/usuario (solo visible para admins) -->
-    <div id="viewToggle" class="view-toggle" style="display: none;">
-        <button id="viewAdminBtn" class="active" onclick="setViewMode('admin')">👑 Admin</button>
-        <button id="viewUserBtn" onclick="setViewMode('user')">👤 Usuario</button>
-    </div>
-
-    <div class="container">
-        <div class="header">
-            <div class="logo">🎬 CineBot</div>
-            <div id="userDisplay" class="user-info">
-                <i class="fas fa-spinner fa-pulse"></i> Cargando...
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-blue-400 to-purple-400 text-transparent bg-clip-text">
+                🎬 CineBot
+            </h1>
+            <div id="userDisplay" class="glass-card px-6 py-3 text-sm">
+                <i class="fas fa-spinner fa-pulse mr-2"></i>Cargando...
             </div>
         </div>
 
-        <div id="mainContent" class="loading">
-            <i class="fas fa-spinner fa-pulse fa-3x"></i>
-            <p>Cargando plataforma...</p>
+        <!-- Contenido principal -->
+        <div id="mainContent" class="space-y-8">
+            <!-- El JS llenará esto -->
         </div>
     </div>
 
     <script>
-        // ========== CONFIG ==========
         const API_BASE = window.location.origin;
         const urlParams = new URLSearchParams(window.location.search);
         const TELEGRAM_ID = urlParams.get('tg_id');
 
         let usuario = null;
-        let currentPage = 1;
-        let currentSearch = '';
-        let viewMode = 'admin'; // 'admin' o 'user' (para previsualización)
+        let solicitudesPendientes = [];
 
-        // ========== PARTÍCULAS DE FONDO ==========
-        const canvas = document.getElementById('particles-canvas');
-        const ctx = canvas.getContext('2d');
-        let particles = [];
-
-        function initParticles() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            const particleCount = 80;
-            for (let i = 0; i < particleCount; i++) {
-                particles.push({
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * canvas.height,
-                    radius: Math.random() * 2 + 1,
-                    speedX: (Math.random() - 0.5) * 0.5,
-                    speedY: (Math.random() - 0.5) * 0.5,
-                    color: `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.2})`
-                });
-            }
-            animateParticles();
-        }
-
-        function animateParticles() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            for (let p of particles) {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                ctx.fillStyle = p.color;
-                ctx.fill();
-                p.x += p.speedX;
-                p.y += p.speedY;
-                if (p.x < 0 || p.x > canvas.width) p.speedX *= -1;
-                if (p.y < 0 || p.y > canvas.height) p.speedY *= -1;
-            }
-            requestAnimationFrame(animateParticles);
-        }
-
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        });
-
-        initParticles();
-
-        // ========== TEMAS ==========
-        function cambiarTema(tema) {
-            document.body.className = tema;
-            localStorage.setItem('tema', tema);
-        }
-        const temaGuardado = localStorage.getItem('tema') || 'futurista';
-        cambiarTema(temaGuardado);
-
-        // ========== IDENTIFICACIÓN ==========
+        // ========== FUNCIONES ==========
         async function identificarUsuario() {
             if (!TELEGRAM_ID) {
                 document.getElementById('mainContent').innerHTML = `
-                    <div class="card" style="text-align: center; max-width: 500px; margin: 2rem auto;">
-                        <i class="fas fa-exclamation-triangle fa-3x" style="color: #f59e0b;"></i>
-                        <h2 style="margin: 1rem 0;">No se pudo identificar</h2>
-                        <p>Para usar la webapp, ábrela desde el bot de Telegram.</p>
-                        <a href="https://t.me/your_bot_username" target="_blank" class="btn" style="margin-top: 1rem;">
-                            <i class="fab fa-telegram"></i> Ir al bot
-                        </a>
+                    <div class="glass-card p-8 text-center max-w-md mx-auto">
+                        <i class="fas fa-exclamation-triangle text-5xl text-yellow-400 mb-4"></i>
+                        <h2 class="text-2xl font-bold mb-2">No se pudo identificar</h2>
+                        <p class="mb-6">Para usar la webapp, ábrela desde el bot de Telegram.</p>
+                        <a href="https://t.me/your_bot_username" target="_blank" class="btn-primary inline-block">Ir al bot</a>
                     </div>
                 `;
                 return;
@@ -327,76 +131,78 @@
                 });
                 const data = await res.json();
                 usuario = { id: TELEGRAM_ID, ...data };
-                if (usuario.es_admin) {
-                    document.getElementById('viewToggle').style.display = 'flex';
-                }
-                actualizarInterfaz();
+                actualizarUI();
             } catch (e) {
                 console.error(e);
-                document.getElementById('mainContent').innerHTML = '<p class="card">Error de conexión. Intenta de nuevo.</p>';
+                document.getElementById('mainContent').innerHTML = '<p class="glass-card p-8 text-center">Error de conexión</p>';
             }
         }
 
-        function setViewMode(mode) {
-            viewMode = mode;
-            document.getElementById('viewAdminBtn').classList.toggle('active', mode === 'admin');
-            document.getElementById('viewUserBtn').classList.toggle('active', mode === 'user');
-            actualizarInterfaz();
-        }
-
-        function actualizarInterfaz() {
+        function actualizarUI() {
             const userDisplay = document.getElementById('userDisplay');
             if (usuario.activo) {
                 userDisplay.innerHTML = `
-                    <i class="fas fa-check-circle" style="color: #10b981;"></i>
-                    <span>Plan ${usuario.plan === 'clasico' ? 'Clásico' : 'Premium'}</span>
-                    <span class="badge">🎟️ ${new Date(usuario.expiracion).toLocaleDateString()}</span>
+                    <i class="fas fa-check-circle text-green-400 mr-2"></i>
+                    <span class="font-medium">${usuario.plan === 'clasico' ? '⚜️ Clásico' : '💎 Premium'}</span>
+                    <span class="badge ml-2">${new Date(usuario.expiracion).toLocaleDateString()}</span>
                 `;
             } else {
                 userDisplay.innerHTML = `
-                    <i class="fas fa-clock" style="color: #f59e0b;"></i>
+                    <i class="fas fa-clock text-yellow-400 mr-2"></i>
                     <span>Suscripción inactiva</span>
                 `;
             }
 
-            // Si estamos en modo vista previa 'user' aunque seamos admin, mostramos como usuario normal
-            const esAdminReal = usuario.es_admin;
-            const mostrarComoAdmin = esAdminReal && viewMode === 'admin';
-
-            if (mostrarComoAdmin) {
+            if (usuario.es_admin) {
                 mostrarPanelAdmin();
             } else if (usuario.activo) {
                 mostrarCatalogo();
             } else {
-                mostrarPlanesPago();
+                mostrarPlanes();
             }
         }
 
-        function mostrarPlanesPago() {
+        function mostrarPlanes() {
             document.getElementById('mainContent').innerHTML = `
-                <div class="card" style="text-align: center;">
-                    <h2 style="font-size: 2rem; margin-bottom: 1rem;">🎟️ Elige tu plan</h2>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-top: 2rem;">
-                        <div class="card" style="padding: 2rem;">
-                            <i class="fas fa-ticket-alt fa-3x" style="color: var(--accent);"></i>
-                            <h3 style="font-size: 1.8rem; margin: 1rem 0;">Clásico</h3>
-                            <p style="font-size: 2rem; font-weight: 800;">200 CUP</p>
-                            <p style="opacity: 0.8;">(Saldo: 120 CUP)</p>
-                            <button onclick="mostrarFormPago('clasico')" class="btn" style="margin-top: 1.5rem; width: 100%;">
-                                Seleccionar
-                            </button>
+                <div class="glass-card p-8">
+                    <h2 class="text-3xl font-bold mb-8 text-center">Elige tu plan</h2>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <!-- Plan Clásico -->
+                        <div class="plan-card clasico">
+                            <div class="flex items-center gap-3 mb-4">
+                                <span class="text-4xl">⚜️</span>
+                                <h3 class="text-2xl font-bold">Clásico</h3>
+                            </div>
+                            <ul class="space-y-3 mb-6">
+                                <li class="flex items-center gap-2"><i class="fas fa-check-circle text-green-400"></i> Catálogo completo</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check-circle text-green-400"></i> Visualización sin límites</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-times-circle text-red-400"></i> No reenviar/guardar</li>
+                            </ul>
+                            <div class="bg-white/10 rounded-xl p-4 mb-4">
+                                <p class="text-sm opacity-70">💳 Tarjeta: <span class="font-mono">200 CUP</span></p>
+                                <p class="text-sm opacity-70">📱 Saldo: <span class="font-mono">120 CUP</span></p>
+                            </div>
+                            <button onclick="mostrarFormPago('clasico')" class="btn-primary w-full">Seleccionar</button>
                         </div>
-                        <div class="card" style="padding: 2rem;">
-                            <i class="fas fa-star fa-3x" style="color: #fbbf24;"></i>
-                            <h3 style="font-size: 1.8rem; margin: 1rem 0;">Premium</h3>
-                            <p style="font-size: 2rem; font-weight: 800;">350 CUP</p>
-                            <p style="opacity: 0.8;">(Saldo: 200 CUP)</p>
-                            <button onclick="mostrarFormPago('premium')" class="btn" style="margin-top: 1.5rem; width: 100%;">
-                                Seleccionar
-                            </button>
+                        <!-- Plan Premium -->
+                        <div class="plan-card premium">
+                            <div class="flex items-center gap-3 mb-4">
+                                <span class="text-4xl">💎</span>
+                                <h3 class="text-2xl font-bold">Premium</h3>
+                            </div>
+                            <ul class="space-y-3 mb-6">
+                                <li class="flex items-center gap-2"><i class="fas fa-check-circle text-green-400"></i> Todo lo del plan Clásico</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check-circle text-green-400"></i> Reenvío y guardado</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check-circle text-green-400"></i> Prioridad en solicitudes</li>
+                            </ul>
+                            <div class="bg-white/10 rounded-xl p-4 mb-4">
+                                <p class="text-sm opacity-70">💳 Tarjeta: <span class="font-mono">350 CUP</span></p>
+                                <p class="text-sm opacity-70">📱 Saldo: <span class="font-mono">200 CUP</span></p>
+                            </div>
+                            <button onclick="mostrarFormPago('premium')" class="btn-primary w-full">Seleccionar</button>
                         </div>
                     </div>
-                    <div id="formPagoContainer" style="margin-top: 2rem;"></div>
+                    <div id="formPagoContainer" class="mt-8"></div>
                 </div>
             `;
         }
@@ -404,24 +210,27 @@
         function mostrarFormPago(plan) {
             const container = document.getElementById('formPagoContainer');
             container.innerHTML = `
-                <div class="card" style="max-width: 600px; margin: 0 auto;">
-                    <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">💰 Pago plan ${plan === 'clasico' ? 'Clásico' : 'Premium'}</h3>
-                    <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
-                        <p><strong>Métodos de pago:</strong></p>
-                        <ul style="list-style: none; margin-top: 0.5rem; text-align: left;">
-                            <li>🏦 BPA: 9248-1299-7027-1730 / 63806513</li>
-                            <li>🏧 METRO: 9238959871181386 / 63806513</li>
-                            <li>📱 Monedero: 63806513</li>
-                            <li>📞 Saldo: 63806513</li>
-                        </ul>
+                <div class="glass-card p-6 max-w-2xl mx-auto">
+                    <h3 class="text-2xl font-bold mb-6">Pago plan ${plan === 'clasico' ? '⚜️ Clásico' : '💎 Premium'}</h3>
+                    <div class="grid md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-white/10 rounded-xl p-4">
+                            <h4 class="font-bold mb-2"><i class="fas fa-credit-card mr-2"></i>Transferencia</h4>
+                            <p class="font-mono text-sm break-all">9248-1299-7027-1730</p>
+                            <p class="text-xs mt-1">Confirmación: 63806513</p>
+                        </div>
+                        <div class="bg-white/10 rounded-xl p-4">
+                            <h4 class="font-bold mb-2"><i class="fas fa-mobile-alt mr-2"></i>Saldo móvil</h4>
+                            <p class="font-mono text-sm">63806513</p>
+                            <p class="text-xs mt-1">Monto: ${plan === 'clasico' ? '120' : '200'} CUP</p>
+                        </div>
                     </div>
-                    <select id="metodoPago" class="btn" style="width: 100%; margin-bottom: 1rem; background: rgba(255,255,255,0.1);">
-                        <option value="tarjeta">Tarjeta / Monedero</option>
-                        <option value="saldo">Saldo Móvil</option>
+                    <select id="metodoPago" class="w-full p-3 rounded-xl bg-white/10 border border-white/20 mb-4">
+                        <option value="tarjeta">Transferencia bancaria</option>
+                        <option value="saldo">Saldo móvil</option>
                     </select>
-                    <input type="file" id="captura" accept="image/*" style="width: 100%; padding: 0.5rem; margin-bottom: 1rem;">
-                    <button onclick="enviarCaptura('${plan}')" class="btn" style="width: 100%;">
-                        <i class="fas fa-upload"></i> Enviar comprobante
+                    <input type="file" id="captura" accept="image/*" class="w-full p-2 rounded-xl bg-white/10 border border-white/20 mb-4">
+                    <button onclick="enviarCaptura('${plan}')" class="btn-primary w-full">
+                        <i class="fas fa-upload mr-2"></i>Enviar comprobante
                     </button>
                 </div>
             `;
@@ -444,7 +253,7 @@
                     })
                 });
                 if (res.ok) {
-                    alert('✅ Solicitud enviada. Espera la aprobación.');
+                    alert('✅ Solicitud enviada. Espera la aprobación del administrador.');
                     document.getElementById('formPagoContainer').innerHTML = '';
                 } else {
                     alert('❌ Error al enviar');
@@ -455,88 +264,72 @@
 
         function mostrarCatalogo() {
             document.getElementById('mainContent').innerHTML = `
-                <div class="card">
-                    <h2 style="font-size: 2rem; margin-bottom: 1.5rem;">🎥 Catálogo de Películas</h2>
-                    <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+                <div class="glass-card p-8">
+                    <h2 class="text-3xl font-bold mb-6">🎥 Catálogo de películas</h2>
+                    <div class="flex gap-4 mb-6">
                         <input type="text" id="buscador" placeholder="Buscar por título..." 
-                               style="flex: 1; padding: 1rem; border-radius: 40px; border: none; background: rgba(255,255,255,0.1);">
-                        <button onclick="buscarPeliculas(1)" class="btn">
-                            <i class="fas fa-search"></i> Buscar
-                        </button>
+                               class="flex-1 p-3 rounded-xl bg-white/10 border border-white/20">
+                        <button onclick="buscarPeliculas(1)" class="btn-primary">Buscar</button>
                     </div>
-                    <div id="catalogoGrid" class="grid-catalogo"></div>
-                    <div id="paginacion" style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 2rem;"></div>
+                    <div id="catalogoGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                    <div id="paginacion" class="flex justify-center gap-2 mt-6"></div>
                 </div>
             `;
             buscarPeliculas(1);
         }
 
         async function buscarPeliculas(page = 1) {
-            currentPage = page;
-            currentSearch = document.getElementById('buscador')?.value || '';
+            const search = document.getElementById('buscador')?.value || '';
             const res = await fetch(API_BASE + '/api/catalogo', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    telegram_id: TELEGRAM_ID,
-                    page: currentPage,
-                    search: currentSearch
-                })
+                body: JSON.stringify({ telegram_id: TELEGRAM_ID, page, search })
             });
-            if (!res.ok) {
-                alert('No tienes suscripción activa');
-                return;
-            }
+            if (!res.ok) return alert('No tienes suscripción activa');
             const data = await res.json();
-            renderCatalogo(data.data, data.total, data.page);
-        }
-
-        function renderCatalogo(peliculas, total, page) {
             const grid = document.getElementById('catalogoGrid');
-            if (!peliculas.length) {
-                grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">No hay películas</p>';
+            if (!data.data.length) {
+                grid.innerHTML = '<p class="text-center col-span-full">No hay películas</p>';
                 return;
             }
-            grid.innerHTML = peliculas.map(p => `
-                <div class="card pelicula-card" onclick="solicitarPelicula('${p.id}')">
-                    <i class="fas fa-film"></i>
-                    <h3 style="font-weight: 600; margin-bottom: 0.5rem;">${p.titulo}</h3>
-                    <p style="font-size: 0.8rem; opacity: 0.7;">ID: ${p.id.substring(0,6)}</p>
+            grid.innerHTML = data.data.map(p => `
+                <div class="glass-card p-4 cursor-pointer hover:scale-105 transition" onclick="solicitarPelicula('${p.id}')">
+                    <i class="fas fa-film text-3xl mb-2 text-blue-400"></i>
+                    <h3 class="font-bold">${p.titulo}</h3>
+                    <p class="text-xs opacity-60">ID: ${p.id.substring(0,8)}</p>
                 </div>
             `).join('');
-
-            const totalPages = Math.ceil(total / 10);
-            const pagDiv = document.getElementById('paginacion');
-            pagDiv.innerHTML = '';
+            const totalPages = Math.ceil(data.total / 10);
+            const pag = document.getElementById('paginacion');
+            pag.innerHTML = '';
             for (let i = 1; i <= totalPages; i++) {
-                pagDiv.innerHTML += `<button onclick="buscarPeliculas(${i})" class="btn" style="padding: 0.5rem 1rem; ${i === page ? 'background: var(--accent);' : ''}">${i}</button>`;
+                pag.innerHTML += `<button onclick="buscarPeliculas(${i})" class="btn-secondary ${i === page ? 'bg-white/20' : ''}">${i}</button>`;
             }
         }
 
-        async function solicitarPelicula(peliculaId) {
+        async function solicitarPelicula(id) {
             if (!confirm('¿Enviar esta película a tu Telegram?')) return;
             const res = await fetch(API_BASE + '/api/request-movie', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    telegram_id: TELEGRAM_ID,
-                    pelicula_id: peliculaId
-                })
+                body: JSON.stringify({ telegram_id: TELEGRAM_ID, pelicula_id: id })
             });
-            if (res.ok) alert('✅ Revisa tu chat de Telegram');
+            if (res.ok) alert('✅ Película enviada a tu chat');
             else alert('❌ Error al enviar');
         }
 
-        function mostrarPanelAdmin() {
+        // ========== PANEL ADMIN ==========
+        async function mostrarPanelAdmin() {
             document.getElementById('mainContent').innerHTML = `
-                <div class="card">
-                    <h2 style="font-size: 2rem; margin-bottom: 1.5rem;"><i class="fas fa-crown" style="color: #fbbf24;"></i> Panel de Administración</h2>
-                    <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem;">
-                        <button onclick="cargarSolicitudes()" class="btn"><i class="fas fa-clock"></i> Solicitudes pendientes</button>
-                        <button onclick="cargarUsuarios()" class="btn"><i class="fas fa-users"></i> Usuarios</button>
-                        <button onclick="mostrarCatalogoAdmin()" class="btn"><i class="fas fa-film"></i> Catálogo</button>
+                <div class="glass-card p-8">
+                    <h2 class="text-3xl font-bold mb-6 flex items-center gap-2">
+                        <i class="fas fa-crown text-yellow-400"></i> Panel de Administración
+                    </h2>
+                    <div class="flex gap-4 mb-6">
+                        <button onclick="cargarSolicitudes()" class="btn-secondary"><i class="fas fa-clock mr-2"></i>Solicitudes</button>
+                        <button onclick="cargarUsuarios()" class="btn-secondary"><i class="fas fa-users mr-2"></i>Usuarios</button>
                     </div>
-                    <div id="adminContent"></div>
+                    <div id="adminContent" class="space-y-4"></div>
                 </div>
             `;
             cargarSolicitudes();
@@ -546,7 +339,7 @@
             const res = await fetch(API_BASE + '/api/pending-requests', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({telegram_id: TELEGRAM_ID})
+                body: JSON.stringify({ telegram_id: TELEGRAM_ID })
             });
             if (!res.ok) return alert('No autorizado');
             const solicitudes = await res.json();
@@ -556,43 +349,48 @@
                 return;
             }
             adminDiv.innerHTML = solicitudes.map(s => `
-                <div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap;">
+                <div class="glass-card p-4">
+                    <div class="flex flex-wrap gap-4 items-start justify-between">
                         <div>
                             <p><strong>Usuario:</strong> ${s.telegram_id}</p>
                             <p><strong>Plan:</strong> ${s.plan_solicitado}</p>
                             <p><strong>Método:</strong> ${s.metodo_pago}</p>
                             <p><strong>Fecha:</strong> ${new Date(s.created_at).toLocaleString()}</p>
                         </div>
-                        <img src="${s.captura_url}" alt="Captura" style="max-height: 120px; border-radius: 8px;">
+                        <img src="${s.captura_url}" class="h-24 rounded-lg">
                     </div>
-                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                        <button onclick="aprobarSolicitud('${s.id}')" class="btn" style="background: #10b981;">Aprobar</button>
-                        <button onclick="rechazarSolicitud('${s.id}')" class="btn" style="background: #ef4444;">Rechazar</button>
+                    <div class="flex gap-2 mt-4">
+                        <button onclick="aprobar('${s.id}')" class="btn-primary">Aprobar</button>
+                        <button onclick="rechazar('${s.id}')" class="btn-secondary">Rechazar</button>
                     </div>
                 </div>
             `).join('');
         }
 
-        async function aprobarSolicitud(id) {
+        async function aprobar(id) {
             if (!confirm('¿Aprobar esta solicitud?')) return;
             await fetch(API_BASE + '/api/approve-request', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({admin_id: TELEGRAM_ID, solicitud_id: id})
+                body: JSON.stringify({ admin_id: TELEGRAM_ID, solicitud_id: id })
             });
             cargarSolicitudes();
         }
 
-        async function rechazarSolicitud(id) {
+        async function rechazar(id) {
             const motivo = prompt('Motivo del rechazo:');
             if (!motivo) return;
             await fetch(API_BASE + '/api/reject-request', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({admin_id: TELEGRAM_ID, solicitud_id: id, motivo})
+                body: JSON.stringify({ admin_id: TELEGRAM_ID, solicitud_id: id, motivo })
             });
             cargarSolicitudes();
+        }
+
+        async function cargarUsuarios() {
+            // Implementación básica (puedes expandir)
+            alert('Funcionalidad de usuarios en desarrollo');
         }
 
         // Iniciar
