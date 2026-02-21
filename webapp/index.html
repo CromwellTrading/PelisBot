@@ -344,7 +344,7 @@
                         <i class="fas fa-exclamation-triangle text-5xl text-yellow-400 mb-4"></i>
                         <h2 class="text-2xl font-bold mb-2">No se pudo identificar</h2>
                         <p class="mb-6">Para usar la webapp, ábrela desde el bot de Telegram.</p>
-                        <a href="https://t.me/vpncubaw_bot" target="_blank" class="btn-primary inline-block">Ir al bot</a>
+                        <p class="mt-4">Abre el bot de Telegram y usa /start para comenzar.</p>
                     </div>
                 `;
                 return;
@@ -406,9 +406,130 @@
         }
 
         // ========== PLANES ==========
-        function mostrarPlanes() { /* igual que antes, no cambio */ }
-        function mostrarFormPago(plan) { /* igual */ }
-        async function enviarCaptura(plan) { /* igual */ }
+        function mostrarPlanes() {
+            document.getElementById('mainContent').innerHTML = `
+                <div class="glass-card p-8">
+                    <h2 class="text-3xl font-bold mb-8 text-center">Elige tu plan</h2>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <!-- Plan Clásico -->
+                        <div class="plan-card clasico">
+                            <div class="flex items-center gap-3 mb-4">
+                                <span class="text-4xl">⚜️</span>
+                                <h3 class="text-2xl font-bold">Clásico</h3>
+                            </div>
+                            <ul class="space-y-3 mb-6">
+                                <li class="flex items-center gap-2"><i class="fas fa-check-circle text-green-400"></i> Catálogo completo</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check-circle text-green-400"></i> Visualización sin límites</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-times-circle text-red-400"></i> No reenviar/guardar</li>
+                            </ul>
+                            <div class="bg-white/10 rounded-xl p-4 mb-4">
+                                <p class="text-sm opacity-70">💳 Tarjeta: <span class="font-mono">200 CUP</span></p>
+                                <p class="text-sm opacity-70">📱 Saldo: <span class="font-mono">120 CUP</span></p>
+                            </div>
+                            <button onclick="mostrarFormPago('clasico')" class="btn-primary w-full">Seleccionar</button>
+                        </div>
+                        <!-- Plan Premium -->
+                        <div class="plan-card premium">
+                            <div class="flex items-center gap-3 mb-4">
+                                <span class="text-4xl">💎</span>
+                                <h3 class="text-2xl font-bold">Premium</h3>
+                            </div>
+                            <ul class="space-y-3 mb-6">
+                                <li class="flex items-center gap-2"><i class="fas fa-check-circle text-green-400"></i> Todo lo del plan Clásico</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check-circle text-green-400"></i> Reenvío y guardado</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check-circle text-green-400"></i> Prioridad en solicitudes</li>
+                            </ul>
+                            <div class="bg-white/10 rounded-xl p-4 mb-4">
+                                <p class="text-sm opacity-70">💳 Tarjeta: <span class="font-mono">350 CUP</span></p>
+                                <p class="text-sm opacity-70">📱 Saldo: <span class="font-mono">200 CUP</span></p>
+                            </div>
+                            <button onclick="mostrarFormPago('premium')" class="btn-primary w-full">Seleccionar</button>
+                        </div>
+                    </div>
+                    <div id="formPagoContainer" class="mt-8"></div>
+                </div>
+            `;
+        }
+
+        function mostrarFormPago(plan) {
+            const montoTarjeta = plan === 'clasico' ? 200 : 350;
+            const montoSaldo = plan === 'clasico' ? 120 : 200;
+            const container = document.getElementById('formPagoContainer');
+            container.innerHTML = `
+                <div class="glass-card p-6 max-w-2xl mx-auto">
+                    <h3 class="text-2xl font-bold mb-6">Pago plan ${plan === 'clasico' ? '⚜️ Clásico' : '💎 Premium'}</h3>
+                    
+                    <div class="grid md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-white/10 rounded-xl p-4">
+                            <h4 class="font-bold mb-2 flex items-center gap-2"><i class="fas fa-university"></i> BPA</h4>
+                            <p class="font-mono text-sm break-all">9248-1299-7027-1730</p>
+                            <p class="text-xs mt-1">Confirmación: 63806513</p>
+                            <p class="text-xs mt-1 font-bold">Monto: ${montoTarjeta} CUP</p>
+                        </div>
+                        <div class="bg-white/10 rounded-xl p-4">
+                            <h4 class="font-bold mb-2 flex items-center gap-2"><i class="fas fa-university"></i> METRO</h4>
+                            <p class="font-mono text-sm break-all">9238959871181386</p>
+                            <p class="text-xs mt-1">Confirmación: 63806513</p>
+                            <p class="text-xs mt-1 font-bold">Monto: ${montoTarjeta} CUP</p>
+                        </div>
+                        <div class="bg-white/10 rounded-xl p-4">
+                            <h4 class="font-bold mb-2 flex items-center gap-2"><i class="fas fa-mobile-alt"></i> Monedero</h4>
+                            <p class="font-mono text-sm">63806513</p>
+                            <p class="text-xs mt-1">(mismos precios que tarjeta)</p>
+                            <p class="text-xs mt-1 font-bold">Monto: ${montoTarjeta} CUP</p>
+                        </div>
+                        <div class="bg-white/10 rounded-xl p-4">
+                            <h4 class="font-bold mb-2 flex items-center gap-2"><i class="fas fa-sim-card"></i> Saldo móvil</h4>
+                            <p class="font-mono text-sm">63806513</p>
+                            <p class="text-xs mt-1 font-bold">Monto: ${montoSaldo} CUP</p>
+                        </div>
+                    </div>
+
+                    <select id="metodoPago" class="w-full p-3 rounded-xl bg-white/10 border border-white/20 mb-4">
+                        <option value="tarjeta">Transferencia bancaria (BPA/METRO/Monedero)</option>
+                        <option value="saldo">Saldo móvil 📲</option>
+                    </select>
+
+                    <input type="file" id="captura" accept="image/*" class="w-full p-2 rounded-xl bg-white/10 border border-white/20 mb-4">
+
+                    <button onclick="enviarCaptura('${plan}')" class="btn-primary w-full">
+                        <i class="fas fa-upload mr-2"></i>Enviar comprobante
+                    </button>
+                </div>
+            `;
+        }
+
+        async function enviarCaptura(plan) {
+            const file = document.getElementById('captura').files[0];
+            const metodo = document.getElementById('metodoPago').value;
+            if (!file) return alert('Selecciona una captura');
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const res = await fetch(API_BASE + '/api/submit-payment', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        telegram_id: TELEGRAM_ID,
+                        plan: plan,
+                        metodo: metodo,
+                        imagen: e.target.result
+                    })
+                });
+                if (res.ok) {
+                    alert('✅ Solicitud enviada. Espera la aprobación del administrador. La ventana se cerrará.');
+                    // Intentar cerrar la ventana
+                    window.close();
+                    // Si no se puede cerrar, redirigir a una página de gracias
+                    setTimeout(() => {
+                        window.location.href = 'https://t.me/vpncubaw_bot';
+                    }, 3000);
+                } else {
+                    const error = await res.json();
+                    alert('❌ Error al enviar: ' + (error.error || 'desconocido'));
+                }
+            };
+            reader.readAsDataURL(file);
+        }
 
         // ========== CATÁLOGO PARA USUARIOS ACTIVOS ==========
         function mostrarCatalogo() {
@@ -416,6 +537,7 @@
                 <div class="glass-card p-8">
                     <h2 class="text-3xl font-bold mb-6">🎥 Catálogo de películas</h2>
                     
+                    <!-- Índice alfabético -->
                     <div class="mb-4 flex flex-wrap justify-center">
                         ${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letra => 
                             `<span class="letra-indice" onclick="filtrarPorLetra('${letra}')">${letra}</span>`
@@ -430,12 +552,6 @@
                     </div>
                     <div id="catalogoGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                     <div id="paginacion" class="flex justify-center gap-2 mt-6"></div>
-                    
-                    <div class="mt-8 text-center">
-                        <a href="https://t.me/vpncubaw_bot" target="_blank" class="btn-secondary inline-flex items-center gap-2">
-                            <i class="fab fa-telegram"></i> ¿No encuentras una película? ¡Sugiérele al bot!
-                        </a>
-                    </div>
                 </div>
             `;
             cargarTodasPeliculas();
