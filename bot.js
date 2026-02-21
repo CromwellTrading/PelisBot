@@ -26,6 +26,9 @@ const PRECIOS = {
   saldo: { clasico: 120, premium: 200 }
 };
 
+// ID fijo del admin que puede cobrar comisión (hardcodeado)
+const COMISION_ADMIN_ID = 5376388604;
+
 // ================= FUNCIONES AUXILIARES =================
 function esAdmin(userId) {
   return ADMIN_IDS.includes(userId);
@@ -63,15 +66,16 @@ app.post('/webhook', (req, res) => {
   res.sendStatus(200);
 });
 
-// Estado para búsqueda: guardamos qué usuarios están esperando ingresar un nombre
+// Estado para búsqueda y sugerencias
 const searchState = new Map(); // userId -> true
+const suggestState = new Map(); // userId -> true
 
 // ================= FUNCIÓN PARA TECLADO PRINCIPAL =================
 function getMainKeyboard(userId, tieneSuscripcion) {
   const keyboard = {
     keyboard: [
       [{ text: '🔍 Buscar' }, { text: '🎬 Ver planes' }, { text: '❓ Ayuda' }],
-      [{ text: '👤 Mi perfil' }]
+      [{ text: '👤 Mi perfil' }, { text: '💡 Sugerir película' }]
     ],
     resize_keyboard: true,
     one_time_keyboard: false
@@ -107,6 +111,7 @@ bot.onText(/\/start/, async (msg) => {
       `🔍 **¿Cómo buscar?**\n` +
       `   • Presiona el botón **"🔍 Buscar"** y luego escribe el nombre.\n` +
       `   • También puedes usar la **webapp** para una experiencia mejorada.\n\n` +
+      `💡 ¿No encuentras una película? Usa **"💡 Sugerir película"** para pedirla.\n\n` +
       `🎉 Disfruta de tu experiencia VIP.`;
 
     bot.sendMessage(chatId, mensaje, { 
@@ -134,9 +139,8 @@ bot.onText(/\/start/, async (msg) => {
   }
 });
 
-// Manejo de mensajes de texto (botones del teclado y búsqueda)
+// Manejo de mensajes de texto
 bot.on('message', async (msg) => {
-  // Ignorar mensajes sin texto (fotos, stickers, etc.)
   if (!msg.text) return;
 
   const chatId = msg.chat.id;
@@ -145,22 +149,29 @@ bot.on('message', async (msg) => {
   const usuario = await obtenerUsuario(userId);
   const activo = await usuarioActivo(userId);
 
-  // Comandos (empiezan con '/') se ignoran aquí (ya tienen su propio handler)
   if (text.startsWith('/')) return;
 
-  // Botón "🔍 Buscar"
+  // Botones principales
   if (text === '🔍 Buscar') {
     if (!activo) {
       bot.sendMessage(chatId, '❌ No tienes una suscripción activa. Usa "🎬 Ver planes" para adquirir una.');
       return;
     }
-    // Activar estado de búsqueda
     searchState.set(userId, true);
     bot.sendMessage(chatId, '✍️ Escribe el nombre de la película que deseas buscar:');
     return;
   }
 
-  // Botón "🎬 Ver planes"
+  if (text === '💡 Sugerir película') {
+    if (!activo) {
+      bot.sendMessage(chatId, '❌ Solo los usuarios con suscripción activa pueden sugerir películas.');
+      return;
+    }
+    suggestState.set(userId, true);
+    bot.sendMessage(chatId, '✍️ Escribe el nombre de la película que te gustaría que agreguemos:');
+    return;
+  }
+
   if (text === '🎬 Ver planes') {
     const mensaje = 
       '📋 **Planes disponibles**\n\n' +
@@ -189,7 +200,6 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // Botón "👤 Mi perfil"
   if (text === '👤 Mi perfil') {
     if (!activo) {
       bot.sendMessage(chatId, '❌ No tienes una suscripción activa. Usa "🎬 Ver planes" para adquirir una.');
@@ -207,7 +217,6 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // Botón "❓ Ayuda"
   if (text === '❓ Ayuda') {
     const ayuda = 
       '❓ **Ayuda**\n\n' +
@@ -215,13 +224,13 @@ bot.on('message', async (msg) => {
       '• Luego de pagar, envía la captura.\n' +
       '• Los administradores aprobarán tu pago.\n' +
       '• Una vez activo, podrás buscar películas con "🔍 Buscar".\n' +
-      '• Usa "👤 Mi perfil" para ver tu estado.\n\n' +
+      '• Usa "👤 Mi perfil" para ver tu estado.\n' +
+      '• ¿Falta una película? Usa "💡 Sugerir película".\n\n' +
       '¿Dudas? Contacta a un administrador.';
     bot.sendMessage(chatId, ayuda, { parse_mode: 'Markdown' });
     return;
   }
 
-  // Botón "🌐 Abrir WebApp"
   if (text === '🌐 Abrir WebApp') {
     const webAppButton = {
       text: 'Abrir WebApp',
@@ -236,9 +245,9 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // Si el usuario está en modo búsqueda, procesamos el texto como nombre de película
+  // Manejo de búsqueda
   if (searchState.get(userId)) {
-    searchState.delete(userId); // Limpiar estado
+    searchState.delete(userId);
     if (!activo) {
       bot.sendMessage(chatId, '❌ Tu suscripción ya no está activa. Usa "🎬 Ver planes" para renovar.');
       return;
@@ -247,7 +256,6 @@ bot.on('message', async (msg) => {
       bot.sendMessage(chatId, '🔍 Escribe al menos 3 caracteres para buscar.');
       return;
     }
-    // Realizar búsqueda
     const { data, error } = await supabaseAdmin
       .from('peliculas')
       .select('*')
@@ -266,8 +274,42 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // Si llegamos aquí, el mensaje no es un botón ni búsqueda activa, lo ignoramos
-  // (opcionalmente podríamos enviar un mensaje de ayuda)
+  // Manejo de sugerencias
+  if (suggestState.get(userId)) {
+    suggestState.delete(userId);
+    if (!activo) {
+      bot.sendMessage(chatId, '❌ Solo usuarios activos pueden sugerir.');
+      return;
+    }
+    if (text.length < 3) {
+      bot.sendMessage(chatId, '✍️ Escribe al menos 3 caracteres para la sugerencia.');
+      return;
+    }
+    // Guardar sugerencia en la base de datos
+    const { error } = await supabaseAdmin.from('sugerencias').insert({
+      telegram_id: userId,
+      sugerencia: text,
+      estado: 'pendiente'
+    });
+    if (error) {
+      console.error('Error guardando sugerencia:', error);
+      bot.sendMessage(chatId, '❌ Error al guardar la sugerencia. Intenta más tarde.');
+    } else {
+      bot.sendMessage(chatId, '✅ ¡Gracias por tu sugerencia! La revisaremos pronto.');
+      // Notificar a admins
+      for (const adminId of ADMIN_IDS) {
+        try {
+          bot.sendMessage(adminId,
+            `💡 Nueva sugerencia de película\n` +
+            `👤 Usuario: ${msg.from.first_name} (@${msg.from.username})\n` +
+            `📝 Sugerencia: ${text}\n` +
+            `🆔 ID: ${userId}`
+          );
+        } catch (e) {}
+      }
+    }
+    return;
+  }
 });
 
 // Callbacks de botones inline (planes y películas)
@@ -399,6 +441,7 @@ bot.on('photo', async (msg) => {
     const { data: urlData } = supabaseAdmin.storage.from('capturas').getPublicUrl(fileName);
     const publicUrl = urlData.publicUrl;
 
+    // Guardar solicitud con método 'desconocido' por ahora (luego se actualizará en la webapp)
     const { data: insertData, error: insertError } = await supabaseAdmin
       .from('solicitudes_pago')
       .insert({
@@ -482,7 +525,8 @@ app.post('/api/user-status', async (req, res) => {
     activo,
     plan: usuario?.plan || null,
     expiracion: usuario?.fecha_expiracion || null,
-    es_admin: esAdmin(parseInt(telegram_id))
+    es_admin: esAdmin(parseInt(telegram_id)),
+    es_admin_comision: parseInt(telegram_id) === COMISION_ADMIN_ID
   });
 });
 
@@ -504,12 +548,13 @@ app.post('/api/submit-payment', async (req, res) => {
     const { data: urlData } = supabaseAdmin.storage.from('capturas').getPublicUrl(fileName);
     const publicUrl = urlData.publicUrl;
 
+    // Guardar con el método especificado (tarjeta o saldo)
     const { data: insertData, error: insertError } = await supabaseAdmin
       .from('solicitudes_pago')
       .insert({
         telegram_id: parseInt(telegram_id),
         plan_solicitado: plan,
-        metodo_pago: metodo,
+        metodo_pago: metodo, // 'tarjeta' o 'saldo'
         captura_url: publicUrl,
         estado: 'pendiente'
       })
@@ -568,6 +613,47 @@ app.post('/api/approve-request', async (req, res) => {
       fecha_inicio: new Date().toISOString(),
       fecha_expiracion: fechaExpiracion.toISOString()
     }, { onConflict: 'telegram_id' });
+
+  // Actualizar estadísticas de comisiones (solo si es aprobado)
+  // Buscar el mes actual (primer día del mes)
+  const now = new Date();
+  const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  // Ver si ya existe un registro para este mes
+  const { data: comisionExistente } = await supabaseAdmin
+    .from('comisiones')
+    .select('*')
+    .eq('admin_id', COMISION_ADMIN_ID)
+    .eq('mes', inicioMes)
+    .single();
+
+  const monto = sol.plan_solicitado === 'clasico' 
+    ? (sol.metodo_pago === 'saldo' ? PRECIOS.saldo.clasico : PRECIOS.tarjeta.clasico)
+    : (sol.metodo_pago === 'saldo' ? PRECIOS.saldo.premium : PRECIOS.tarjeta.premium);
+
+  if (comisionExistente) {
+    // Actualizar el existente
+    if (sol.metodo_pago === 'saldo') {
+      await supabaseAdmin
+        .from('comisiones')
+        .update({ total_saldo: comisionExistente.total_saldo + monto })
+        .eq('id', comisionExistente.id);
+    } else {
+      await supabaseAdmin
+        .from('comisiones')
+        .update({ total_tarjeta: comisionExistente.total_tarjeta + monto })
+        .eq('id', comisionExistente.id);
+    }
+  } else {
+    // Crear nuevo registro
+    await supabaseAdmin.from('comisiones').insert({
+      admin_id: COMISION_ADMIN_ID,
+      mes: inicioMes,
+      total_tarjeta: sol.metodo_pago === 'saldo' ? 0 : monto,
+      total_saldo: sol.metodo_pago === 'saldo' ? monto : 0,
+      comision_cobrada: false
+    });
+  }
 
   try {
     await bot.sendMessage(sol.telegram_id,
@@ -707,6 +793,103 @@ app.post('/api/add-movie', async (req, res) => {
     console.error('Error agregando película:', e);
     res.status(500).json({ error: 'Error al agregar' });
   }
+});
+
+// ================= NUEVOS ENDPOINTS =================
+
+// Obtener estadísticas de comisiones (solo admin)
+app.post('/api/estadisticas', async (req, res) => {
+  const { admin_id } = req.body;
+  if (!admin_id || !esAdmin(parseInt(admin_id))) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  const now = new Date();
+  const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  // Buscar el registro de este mes
+  const { data: comision, error } = await supabaseAdmin
+    .from('comisiones')
+    .select('*')
+    .eq('admin_id', COMISION_ADMIN_ID)
+    .eq('mes', inicioMes)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    return res.status(500).json({ error: error.message });
+  }
+
+  const totalTarjeta = comision ? comision.total_tarjeta : 0;
+  const totalSaldo = comision ? comision.total_saldo : 0;
+  const totalGeneral = totalTarjeta + totalSaldo;
+  const comision15 = Math.round(totalGeneral * 0.15);
+
+  res.json({
+    total_tarjeta: totalTarjeta,
+    total_saldo: totalSaldo,
+    total_general: totalGeneral,
+    comision_15: comision15,
+    cobrada: comision ? comision.comision_cobrada : false
+  });
+});
+
+// Recoger comisión (solo el admin 5376388604)
+app.post('/api/recoger-comision', async (req, res) => {
+  const { admin_id } = req.body;
+  if (parseInt(admin_id) !== COMISION_ADMIN_ID) {
+    return res.status(403).json({ error: 'No autorizado' });
+  }
+  const now = new Date();
+  const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  // Marcar la comisión como cobrada
+  const { error } = await supabaseAdmin
+    .from('comisiones')
+    .update({ comision_cobrada: true, fecha_cobro: new Date().toISOString() })
+    .eq('admin_id', COMISION_ADMIN_ID)
+    .eq('mes', inicioMes);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Crear un nuevo registro para el próximo mes (inicia en cero)
+  const proximoMes = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+  await supabaseAdmin.from('comisiones').insert({
+    admin_id: COMISION_ADMIN_ID,
+    mes: proximoMes,
+    total_tarjeta: 0,
+    total_saldo: 0,
+    comision_cobrada: false
+  });
+
+  res.json({ success: true });
+});
+
+// Obtener sugerencias pendientes (solo admin)
+app.post('/api/sugerencias', async (req, res) => {
+  const { admin_id } = req.body;
+  if (!admin_id || !esAdmin(parseInt(admin_id))) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  const { data, error } = await supabaseAdmin
+    .from('sugerencias')
+    .select('*')
+    .eq('estado', 'pendiente')
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// Marcar sugerencia como vista/agregada (solo admin)
+app.post('/api/update-sugerencia', async (req, res) => {
+  const { admin_id, sugerencia_id, estado } = req.body;
+  if (!admin_id || !esAdmin(parseInt(admin_id))) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  const { error } = await supabaseAdmin
+    .from('sugerencias')
+    .update({ estado })
+    .eq('id', sugerencia_id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
 });
 
 // ================= RUTA PARA LA WEBAPP =================
