@@ -22,8 +22,8 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 // Precios actualizados (después de comisión del 15%)
 const PRECIOS = {
-  tarjeta: { clasico: 250, premium: 400 },
-  saldo: { clasico: 160, premium: 250 }
+  tarjeta: { clasico: 235, premium: 415 },
+  saldo: { clasico: 145, premium: 235 }
 };
 
 // ID fijo del admin que puede cobrar comisión (hardcodeado)
@@ -75,13 +75,13 @@ function getMainKeyboard(userId, tieneSuscripcion) {
   const keyboard = {
     keyboard: [
       [{ text: '🔍 Buscar' }, { text: '🎬 Ver planes' }, { text: '❓ Ayuda' }],
-      [{ text: '👤 Mi perfil' }, { text: '💡 Sugerir película' }, { text: '🔐 VPN' }]
+      [{ text: '👤 Mi perfil' }, { text: '💡 Sugerir película' }],
+      [{ text: '🔐 VPN' }],
+      [{ text: '🌐 Abrir WebApp' }]
     ],
     resize_keyboard: true,
     one_time_keyboard: false
   };
-
-  keyboard.keyboard.push([{ text: '🌐 Abrir WebApp' }]);
 
   return keyboard;
 }
