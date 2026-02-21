@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CineBot · Plataforma de Películas</title>
+    <title>CineBot · Plataforma VIP</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Fuse.js para búsqueda difusa -->
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
     <style>
-        * {
-            font-family: 'Inter', sans-serif;
-        }
+        * { font-family: 'Inter', sans-serif; }
         body {
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
             min-height: 100vh;
@@ -67,12 +67,8 @@
             border-radius: 24px;
             padding: 24px;
         }
-        .plan-card.clasico {
-            border-top: 4px solid #60a5fa;
-        }
-        .plan-card.premium {
-            border-top: 4px solid #fbbf24;
-        }
+        .plan-card.clasico { border-top: 4px solid #60a5fa; }
+        .plan-card.premium { border-top: 4px solid #fbbf24; }
         .badge {
             display: inline-block;
             padding: 4px 12px;
@@ -112,21 +108,70 @@
             background: #3b82f6;
             color: white;
         }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 16px;
+        }
+        .close {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover { color: #ccc; }
+        .letra-indice {
+            display: inline-block;
+            width: 36px;
+            height: 36px;
+            line-height: 36px;
+            text-align: center;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            margin: 0 4px 8px 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .letra-indice:hover, .letra-indice.active {
+            background: #3b82f6;
+            color: white;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
+    <!-- Modal para imagen ampliada -->
+    <div id="imageModal" class="modal" onclick="cerrarModal()">
+        <span class="close">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+
     <div class="max-w-7xl mx-auto">
         <!-- Header -->
         <div class="flex justify-between items-center mb-8">
             <h1 class="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-blue-400 to-purple-400 text-transparent bg-clip-text">
-                🎬 CineBot
+                🎬 CineBot VIP
             </h1>
             <div id="userDisplay" class="glass-card px-6 py-3 text-sm flex items-center gap-3">
                 <i class="fas fa-spinner fa-pulse mr-2"></i>Cargando...
             </div>
         </div>
 
-        <!-- Toggle de vista para admins (oculto por defecto) -->
+        <!-- Toggle de vista para admins -->
         <div id="viewToggleContainer" class="flex justify-end mb-4 hidden">
             <div class="view-toggle">
                 <button id="viewAdminBtn" onclick="setViewMode('admin')" class="active">👑 Admin</button>
@@ -135,9 +180,7 @@
         </div>
 
         <!-- Contenido principal -->
-        <div id="mainContent" class="space-y-8">
-            <!-- El JS llenará esto -->
-        </div>
+        <div id="mainContent" class="space-y-8"></div>
     </div>
 
     <script>
@@ -147,10 +190,24 @@
 
         let usuario = null;
         let viewMode = 'admin';
-        let currentPageCatalogo = 1;
-        let currentSearchCatalogo = '';
+        let allPeliculas = [];
+        let fuse = null;
 
-        // ========== FUNCIONES ==========
+        // ========== MODAL ==========
+        function abrirModal(url) {
+            document.getElementById('modalImage').src = url;
+            document.getElementById('imageModal').style.display = 'flex';
+        }
+        function cerrarModal() {
+            document.getElementById('imageModal').style.display = 'none';
+        }
+        window.onclick = function(event) {
+            if (event.target == document.getElementById('imageModal')) {
+                cerrarModal();
+            }
+        }
+
+        // ========== IDENTIFICACIÓN ==========
         async function identificarUsuario() {
             if (!TELEGRAM_ID) {
                 document.getElementById('mainContent').innerHTML = `
@@ -219,7 +276,7 @@
             }
         }
 
-        // ========== VISTA DE PLANES ==========
+        // ========== PLANES (para usuarios inactivos) ==========
         function mostrarPlanes() {
             document.getElementById('mainContent').innerHTML = `
                 <div class="glass-card p-8">
@@ -345,8 +402,17 @@
             document.getElementById('mainContent').innerHTML = `
                 <div class="glass-card p-8">
                     <h2 class="text-3xl font-bold mb-6">🎥 Catálogo de películas</h2>
+                    
+                    <!-- Índice alfabético -->
+                    <div class="mb-4 flex flex-wrap justify-center">
+                        ${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letra => 
+                            `<span class="letra-indice" onclick="filtrarPorLetra('${letra}')">${letra}</span>`
+                        ).join('')}
+                        <span class="letra-indice" onclick="filtrarPorLetra('')">Todos</span>
+                    </div>
+
                     <div class="flex gap-4 mb-6">
-                        <input type="text" id="buscador" placeholder="Buscar por título..." 
+                        <input type="text" id="buscador" placeholder="Buscar por título... (acepta errores)" 
                                class="flex-1 p-3 rounded-xl bg-white/10 border border-white/20">
                         <button onclick="buscarPeliculas(1)" class="btn-primary">Buscar</button>
                     </div>
@@ -354,34 +420,61 @@
                     <div id="paginacion" class="flex justify-center gap-2 mt-6"></div>
                 </div>
             `;
-            buscarPeliculas(1);
+            cargarTodasPeliculas();
+        }
+
+        async function cargarTodasPeliculas() {
+            const res = await fetch(API_BASE + '/api/catalogo', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ telegram_id: TELEGRAM_ID, page: 1, search: '' })
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            allPeliculas = data.data;
+            fuse = new Fuse(allPeliculas, {
+                keys: ['titulo'],
+                threshold: 0.4,
+                includeScore: true
+            });
+            mostrarPagina(1, allPeliculas);
+        }
+
+        function filtrarPorLetra(letra) {
+            document.querySelectorAll('.letra-indice').forEach(el => el.classList.remove('active'));
+            if (letra) event.target.classList.add('active');
+            const filtradas = letra ? allPeliculas.filter(p => p.titulo.toUpperCase().startsWith(letra)) : allPeliculas;
+            mostrarPagina(1, filtradas);
         }
 
         async function buscarPeliculas(page = 1) {
             const search = document.getElementById('buscador')?.value || '';
-            const res = await fetch(API_BASE + '/api/catalogo', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ telegram_id: TELEGRAM_ID, page, search })
-            });
-            if (!res.ok) {
-                alert('No tienes suscripción activa');
+            if (!search) {
+                mostrarPagina(page, allPeliculas);
                 return;
             }
-            const data = await res.json();
+            const results = fuse.search(search);
+            const filtradas = results.map(r => r.item);
+            mostrarPagina(page, filtradas);
+        }
+
+        function mostrarPagina(page, lista) {
+            const limit = 10;
+            const offset = (page - 1) * limit;
+            const paginadas = lista.slice(offset, offset + limit);
             const grid = document.getElementById('catalogoGrid');
-            if (!data.data.length) {
+            if (!paginadas.length) {
                 grid.innerHTML = '<p class="text-center col-span-full">No hay películas</p>';
                 return;
             }
-            grid.innerHTML = data.data.map(p => `
+            grid.innerHTML = paginadas.map(p => `
                 <div class="glass-card p-4 cursor-pointer hover:scale-105 transition" onclick="solicitarPelicula('${p.id}')">
                     <i class="fas fa-film text-3xl mb-2 text-blue-400"></i>
                     <h3 class="font-bold">${p.titulo}</h3>
                     <p class="text-xs opacity-60">ID: ${p.id.substring(0,8)}</p>
                 </div>
             `).join('');
-            const totalPages = Math.ceil(data.total / 10);
+            const totalPages = Math.ceil(lista.length / limit);
             const pag = document.getElementById('paginacion');
             pag.innerHTML = '';
             for (let i = 1; i <= totalPages; i++) {
@@ -400,7 +493,7 @@
             else alert('❌ Error al enviar');
         }
 
-        // ========== PANEL DE ADMINISTRACIÓN ==========
+        // ========== PANEL DE ADMIN ==========
         function mostrarPanelAdmin() {
             document.getElementById('mainContent').innerHTML = `
                 <div class="glass-card p-8">
@@ -427,7 +520,7 @@
             if (activeBtn) activeBtn.classList.add('bg-white/20');
         }
 
-        // ===== SOLICITUDES =====
+        // Solicitudes
         async function cargarSolicitudes() {
             setActiveTab('tabSolicitudes');
             try {
@@ -436,11 +529,7 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ telegram_id: TELEGRAM_ID })
                 });
-                if (!res.ok) {
-                    const error = await res.json();
-                    document.getElementById('adminContent').innerHTML = `<p class="text-red-400">Error: ${error.error || 'No autorizado'}</p>`;
-                    return;
-                }
+                if (!res.ok) throw new Error('No autorizado');
                 const solicitudes = await res.json();
                 const adminDiv = document.getElementById('adminContent');
                 if (!solicitudes.length) {
@@ -456,7 +545,7 @@
                                 <p><strong>Método:</strong> ${s.metodo_pago}</p>
                                 <p><strong>Fecha:</strong> ${new Date(s.created_at).toLocaleString()}</p>
                             </div>
-                            <img src="${s.captura_url}" class="h-24 rounded-lg object-cover">
+                            <img src="${s.captura_url}" class="h-24 rounded-lg object-cover cursor-pointer" onclick="abrirModal('${s.captura_url}')">
                         </div>
                         <div class="flex gap-2 mt-4">
                             <button onclick="aprobarSolicitud('${s.id}')" class="btn-primary">Aprobar</button>
@@ -500,7 +589,7 @@
             }
         }
 
-        // ===== USUARIOS =====
+        // Usuarios
         async function cargarUsuarios() {
             setActiveTab('tabUsuarios');
             try {
@@ -511,37 +600,34 @@
                 });
                 if (!res.ok) throw new Error('No autorizado');
                 const usuarios = await res.json();
-                renderUsuarios(usuarios);
+                const adminDiv = document.getElementById('adminContent');
+                if (!usuarios.length) {
+                    adminDiv.innerHTML = '<p class="text-center py-8">No hay usuarios registrados.</p>';
+                    return;
+                }
+                adminDiv.innerHTML = usuarios.map(u => {
+                    const expiracion = u.fecha_expiracion ? new Date(u.fecha_expiracion).toLocaleDateString() : 'N/A';
+                    const diasRestantes = u.fecha_expiracion ? Math.ceil((new Date(u.fecha_expiracion) - new Date()) / (1000*60*60*24)) : 0;
+                    return `
+                        <div class="glass-card p-4">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p><strong>ID:</strong> ${u.telegram_id}</p>
+                                    <p><strong>Plan:</strong> ${u.plan === 'clasico' ? '⚜️ Clásico' : '💎 Premium'}</p>
+                                    <p><strong>Expira:</strong> ${expiracion}</p>
+                                    <p><strong>Días restantes:</strong> ${diasRestantes}</p>
+                                </div>
+                                <span class="badge">${diasRestantes > 0 ? 'Activo' : 'Inactivo'}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
             } catch (e) {
                 document.getElementById('adminContent').innerHTML = '<p class="text-center py-8">Error al cargar usuarios.</p>';
             }
         }
 
-        function renderUsuarios(usuarios) {
-            const adminDiv = document.getElementById('adminContent');
-            if (!usuarios.length) {
-                adminDiv.innerHTML = '<p class="text-center py-8">No hay usuarios registrados.</p>';
-                return;
-            }
-            adminDiv.innerHTML = usuarios.map(u => {
-                const expiracion = u.fecha_expiracion ? new Date(u.fecha_expiracion).toLocaleDateString() : 'N/A';
-                const diasRestantes = u.fecha_expiracion ? Math.ceil((new Date(u.fecha_expiracion) - new Date()) / (1000*60*60*24)) : 0;
-                return `
-                <div class="glass-card p-4">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p><strong>ID:</strong> ${u.telegram_id}</p>
-                            <p><strong>Plan:</strong> ${u.plan === 'clasico' ? '⚜️ Clásico' : '💎 Premium'}</p>
-                            <p><strong>Expira:</strong> ${expiracion}</p>
-                            <p><strong>Días restantes:</strong> ${diasRestantes}</p>
-                        </div>
-                        <span class="badge">${diasRestantes > 0 ? 'Activo' : 'Inactivo'}</span>
-                    </div>
-                </div>
-            `}).join('');
-        }
-
-        // ===== CATÁLOGO ADMIN =====
+        // Catálogo admin
         async function cargarCatalogoAdmin() {
             setActiveTab('tabCatalogo');
             try {
