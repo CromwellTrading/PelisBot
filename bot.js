@@ -296,7 +296,7 @@ bot.on('message', async (msg) => {
       '• ¿Falta una película? Usa "💡 Sugerir película".\n' +
       '• ¿Tienes dudas? Usa "🎫 Abrir ticket".\n' +
       '• ¿Necesitas VPN? Prueba nuestro bot "🔐 VPN".\n\n' +
-      '¿Dudas? Contacta a un administrador.';
+      '¿Dudas? Escribe aqui cual es tu problema 👇.';
     bot.sendMessage(chatId, ayuda, { parse_mode: 'Markdown' });
     return;
   }
