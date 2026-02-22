@@ -66,9 +66,11 @@ app.post('/webhook', (req, res) => {
   res.sendStatus(200);
 });
 
-// Estados para búsqueda y sugerencias
+// Estados para búsqueda, sugerencias, tickets y respuestas
 const searchState = new Map();
 const suggestState = new Map();
+const ticketState = new Map();        // userId -> true (usuario escribiendo un ticket)
+const respondState = new Map();       // adminId -> { targetUserId } (admin respondiendo a un ticket)
 
 // ================= FUNCIÓN PARA TECLADO PRINCIPAL =================
 function getMainKeyboard(userId, tieneSuscripcion) {
@@ -76,7 +78,7 @@ function getMainKeyboard(userId, tieneSuscripcion) {
     keyboard: [
       [{ text: '🔍 Buscar' }, { text: '🎬 Ver planes' }, { text: '❓ Ayuda' }],
       [{ text: '👤 Mi perfil' }, { text: '💡 Sugerir película' }],
-      [{ text: '🔐 VPN' }],
+      [{ text: '🎫 Abrir ticket' }, { text: '🔐 VPN' }],
       [{ text: '🌐 Abrir WebApp' }]
     ],
     resize_keyboard: true,
@@ -95,7 +97,6 @@ bot.onText(/\/start/, async (msg) => {
   const firstName = msg.from.first_name;
 
   try {
-    // Intentar obtener información del usuario
     const usuario = await obtenerUsuario(userId);
     const activo = await usuarioActivo(userId);
 
@@ -114,6 +115,7 @@ bot.onText(/\/start/, async (msg) => {
         `   • Presiona el botón **"🔍 Buscar"** y luego escribe el nombre.\n` +
         `   • También puedes usar la **webapp** para una experiencia mejorada.\n\n` +
         `💡 ¿No encuentras una película? Usa **"💡 Sugerir película"** para pedirla.\n\n` +
+        `🎫 ¿Tienes dudas? Abre un ticket con **"🎫 Abrir ticket"**.\n\n` +
         `🔐 ¿Necesitas una VPN? Prueba nuestro bot **@vpncubaw_bot** (botón "🔐 VPN").\n\n` +
         `🎉 Disfruta de tu experiencia VIP.`;
 
@@ -142,7 +144,6 @@ bot.onText(/\/start/, async (msg) => {
     }
   } catch (error) {
     console.error('Error en /start:', error);
-    // Mensaje de emergencia: el bot responde incluso si todo falla
     await bot.sendMessage(
       chatId,
       `Hola ${firstName}, el bot está activo. Por favor, intenta usar los botones del menú. Si el problema persiste, contacta a un administrador.`,
@@ -151,20 +152,67 @@ bot.onText(/\/start/, async (msg) => {
   }
 });
 
-// Manejo de mensajes de texto
+// Manejo de mensajes (texto, fotos, etc.)
 bot.on('message', async (msg) => {
-  if (!msg.text) return;
-
   const chatId = msg.chat.id;
-  const text = msg.text;
   const userId = msg.from.id;
-  const usuario = await obtenerUsuario(userId);
-  const activo = await usuarioActivo(userId);
+  const text = msg.text; // puede ser undefined
 
+  // 1. Manejar estados de ticket (usuario enviando mensaje para admin)
+  if (ticketState.has(userId)) {
+    ticketState.delete(userId); // solo se permite un mensaje por ticket
+    // Reenviar el mensaje original a todos los administradores
+    for (const adminId of ADMIN_IDS) {
+      try {
+        // Reenviar el mensaje del usuario al admin
+        const forwardedMsg = await bot.forwardMessage(adminId, chatId, msg.message_id);
+        // Enviar un mensaje con botón para responder, adjuntando el ID del usuario
+        const replyButton = {
+          inline_keyboard: [
+            [{ text: '✏️ Responder', callback_data: `respond_${userId}` }]
+          ]
+        };
+        await bot.sendMessage(adminId, 
+          `📩 Nuevo ticket de ${msg.from.first_name} (@${msg.from.username || 'sin username'}) [ID ${userId}].\n` +
+          `Mensaje reenviado arriba. Haz clic en "Responder" para contestar.`,
+          { reply_markup: replyButton }
+        );
+      } catch (e) {
+        console.error(`Error reenviando ticket al admin ${adminId}:`, e);
+      }
+    }
+    await bot.sendMessage(chatId, '✅ Tu mensaje ha sido enviado a los administradores. Te responderán a la mayor brevedad.');
+    return;
+  }
+
+  // 2. Manejar estados de respuesta (admin respondiendo a un ticket)
+  if (respondState.has(userId)) {
+    const { targetUserId } = respondState.get(userId);
+    respondState.delete(userId);
+    try {
+      // Copiar el mensaje del admin (puede ser cualquier tipo) al usuario destino
+      await bot.copyMessage(targetUserId, chatId, msg.message_id);
+      await bot.sendMessage(chatId, '✅ Respuesta enviada al usuario.');
+    } catch (e) {
+      console.error('Error enviando respuesta:', e);
+      await bot.sendMessage(chatId, '❌ No se pudo enviar la respuesta. El usuario puede haber bloqueado el bot.');
+    }
+    return;
+  }
+
+  // Si no hay texto, ignorar (no podemos procesar comandos sin texto)
+  if (!text) return;
   if (text.startsWith('/')) return;
 
-  // Botones principales
+  // 3. Botones principales (incluyendo el nuevo "Abrir ticket")
+  if (text === '🎫 Abrir ticket') {
+    ticketState.set(userId, true);
+    bot.sendMessage(chatId, '✍️ Escribe tu consulta o mensaje. Puede ser texto, foto, etc. Lo enviaremos a los administradores.');
+    return;
+  }
+
   if (text === '🔍 Buscar') {
+    const activo = await usuarioActivo(userId);
     if (!activo) {
       bot.sendMessage(chatId, '❌ No tienes una suscripción activa. Usa "🎬 Ver planes" para adquirir una.');
       return;
@@ -175,6 +223,7 @@ bot.on('message', async (msg) => {
   }
 
   if (text === '💡 Sugerir película') {
+    const activo = await usuarioActivo(userId);
     if (!activo) {
       bot.sendMessage(chatId, '❌ Solo los usuarios con suscripción activa pueden sugerir películas.');
       return;
@@ -218,6 +267,8 @@ bot.on('message', async (msg) => {
   }
 
   if (text === '👤 Mi perfil') {
+    const usuario = await obtenerUsuario(userId);
+    const activo = await usuarioActivo(userId);
     if (!activo) {
       bot.sendMessage(chatId, '❌ No tienes una suscripción activa. Usa "🎬 Ver planes" para adquirir una.');
       return;
@@ -243,6 +294,7 @@ bot.on('message', async (msg) => {
       '• Una vez activo, podrás buscar películas con "🔍 Buscar".\n' +
       '• Usa "👤 Mi perfil" para ver tu estado.\n' +
       '• ¿Falta una película? Usa "💡 Sugerir película".\n' +
+      '• ¿Tienes dudas? Usa "🎫 Abrir ticket".\n' +
       '• ¿Necesitas VPN? Prueba nuestro bot "🔐 VPN".\n\n' +
       '¿Dudas? Contacta a un administrador.';
     bot.sendMessage(chatId, ayuda, { parse_mode: 'Markdown' });
@@ -263,9 +315,10 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // Manejo de búsqueda
+  // 4. Manejo de búsqueda
   if (searchState.get(userId)) {
     searchState.delete(userId);
+    const activo = await usuarioActivo(userId);
     if (!activo) {
       bot.sendMessage(chatId, '❌ Tu suscripción ya no está activa. Usa "🎬 Ver planes" para renovar.');
       return;
@@ -292,9 +345,10 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // Manejo de sugerencias
+  // 5. Manejo de sugerencias
   if (suggestState.get(userId)) {
     suggestState.delete(userId);
+    const activo = await usuarioActivo(userId);
     if (!activo) {
       bot.sendMessage(chatId, '❌ Solo usuarios activos pueden sugerir.');
       return;
@@ -303,7 +357,6 @@ bot.on('message', async (msg) => {
       bot.sendMessage(chatId, '✍️ Escribe al menos 3 caracteres para la sugerencia.');
       return;
     }
-    // Guardar sugerencia en la base de datos
     const { error } = await supabaseAdmin.from('sugerencias').insert({
       telegram_id: userId,
       sugerencia: text,
@@ -314,7 +367,6 @@ bot.on('message', async (msg) => {
       bot.sendMessage(chatId, '❌ Error al guardar la sugerencia. Intenta más tarde.');
     } else {
       bot.sendMessage(chatId, '✅ ¡Gracias por tu sugerencia! La revisaremos pronto.');
-      // Notificar a admins
       for (const adminId of ADMIN_IDS) {
         try {
           bot.sendMessage(adminId,
@@ -328,9 +380,13 @@ bot.on('message', async (msg) => {
     }
     return;
   }
+
+  // Si llegamos aquí, el mensaje no fue reconocido
+  // Podríamos ignorarlo o enviar un mensaje de ayuda
+  // bot.sendMessage(chatId, 'No entendí ese mensaje. Usa los botones del menú.');
 });
 
-// Callbacks de botones inline (planes y películas)
+// Callbacks de botones inline (planes, películas y responder ticket)
 bot.on('callback_query', async (callbackQuery) => {
   const msg = callbackQuery.message;
   const data = callbackQuery.data;
@@ -338,6 +394,24 @@ bot.on('callback_query', async (callbackQuery) => {
   const chatId = msg.chat.id;
   const messageId = msg.message_id;
 
+  // Responder a ticket
+  if (data.startsWith('respond_')) {
+    const targetUserId = parseInt(data.split('_')[1]);
+    // Verificar que quien hace clic es admin (opcional, pero todos los admins tienen acceso)
+    if (!esAdmin(userId)) {
+      bot.answerCallbackQuery(callbackQuery.id, { text: 'No autorizado', show_alert: true });
+      return;
+    }
+    // Guardar estado de respuesta para este admin
+    respondState.set(userId, { targetUserId });
+    // Eliminar el mensaje con el botón para evitar respuestas duplicadas
+    bot.deleteMessage(chatId, messageId).catch(() => {});
+    bot.sendMessage(chatId, `✍️ Escribe tu respuesta para el usuario ${targetUserId}. Puede ser texto, foto, etc.`);
+    bot.answerCallbackQuery(callbackQuery.id);
+    return;
+  }
+
+  // Manejo de planes y películas
   if (data.startsWith('plan_')) {
     const plan = data.split('_')[1];
     if (!global.userPlans) global.userPlans = new Map();
@@ -437,6 +511,13 @@ bot.on('callback_query', async (callbackQuery) => {
 bot.on('photo', async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
+
+  // Verificar si el usuario está en ticketState, en cuyo caso no procesamos como pago (ya lo hará el handler general)
+  if (ticketState.has(userId)) {
+    return; // el ticket ya se manejará en el evento 'message'
+  }
+
+  // Lógica original de pago
   const plan = global.userPlans?.get(userId);
   if (!plan) {
     bot.sendMessage(chatId, '⚠️ Primero debes elegir un plan con "🎬 Ver planes".');
@@ -459,7 +540,6 @@ bot.on('photo', async (msg) => {
     const { data: urlData } = supabaseAdmin.storage.from('capturas').getPublicUrl(fileName);
     const publicUrl = urlData.publicUrl;
 
-    // Guardar solicitud con método 'desconocido' por ahora (luego se actualizará en la webapp)
     const { data: insertData, error: insertError } = await supabaseAdmin
       .from('solicitudes_pago')
       .insert({
@@ -480,7 +560,6 @@ bot.on('photo', async (msg) => {
       { parse_mode: 'Markdown' }
     );
 
-    // Notificar a admins
     for (const adminId of ADMIN_IDS) {
       try {
         bot.sendMessage(adminId,
